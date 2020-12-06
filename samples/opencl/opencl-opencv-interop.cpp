@@ -890,6 +890,9 @@ int App::run()
     // can be switched on/of by SPACE button
     setUseBuffer(true);
 
+    // use for infinite loop
+    int frame_counter = 0;
+
     // Iterate over all frames
     while (isRunning() && nextFrame(m_frame))
     {
@@ -929,6 +932,12 @@ int App::run()
         imshow("opencl_interop", img_to_show);
 
         handleKey((char)waitKey(3));
+
+        // infinite loop
+        if(frame_counter++ == m_cap.get(CAP_PROP_FRAME_COUNT) -1) {
+          frame_counter = 0;
+          m_cap.set(CAP_PROP_POS_FRAMES, 0);
+        }
     }
 
     return 0;
