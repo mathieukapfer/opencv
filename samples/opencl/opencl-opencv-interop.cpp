@@ -645,8 +645,17 @@ int App::initOpenCL()
             return -1;
 
         res = clBuildProgram(m_program, 1, &m_device_id, 0, 0, 0);
-        if (CL_SUCCESS != res)
-            return -1;
+        if (CL_SUCCESS != res) {
+          // Determine the reason for the error
+          char buildLog[16384];
+          clGetProgramBuildInfo(m_program, m_device_id, CL_PROGRAM_BUILD_LOG,
+                                sizeof(buildLog), buildLog, NULL);
+
+          std::cerr << "Error in kernel: " << std::endl;
+          std::cerr << buildLog;
+          clReleaseProgram(m_program);
+          return -1;
+        }
 
         m_kernelBuf = clCreateKernel(m_program, "bitwise_inv_buf_8uC1", &res);
         if (0 == m_kernelBuf || CL_SUCCESS != res)
