@@ -20,6 +20,14 @@ if(NOT BUILD_EXAMPLES OR NOT OCV_DEPENDENCIES_FOUND)
 endif()
 
 find_package(OpenCL 1.2 QUIET)
+
+if(NOT OpenCL_FOUND AND OPENCL_INCLUDE_DIR AND OPENCL_LIBRARY)
+  set(OpenCL_FOUND TRUE)
+  set(OpenCL_INCLUDE_DIR ${OPENCL_INCLUDE_DIR})
+  set(OpenCL_LIBRARY ${OPENCL_LIBRARY})
+  message(STATUS "Using static OpenCL toolchain")
+endif()
+
 if(NOT OpenCL_FOUND)
   message(STATUS "OpenCL samples are skipped: OpenCL SDK is required")
   return()
