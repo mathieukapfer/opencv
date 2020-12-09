@@ -225,6 +225,8 @@ public:
 
     std::string Name() { return m_name; }
 
+    bool image_support() { return m_image_support; }
+
 private:
     template<typename T>
     cl_int query_param(cl_device_id id, cl_device_info param, T& value)
@@ -431,10 +433,20 @@ public:
 
     void setRunning(bool running)      { m_running = running; }
     void setDoProcess(bool process)    { m_process = process; }
-    void setUseBuffer(bool use_buffer) { m_use_buffer = use_buffer; }
+    void setUseBuffer(bool use_buffer) { m_use_buffer = (m_deviceInfo.image_support() ? use_buffer : true); }
 
 protected:
-    bool nextFrame(cv::Mat& frame) { return m_cap.read(frame); }
+    bool nextFrame(cv::Mat& frame)
+    {
+        bool ret = m_cap.read(frame);
+        // if EOF, back to begin of video
+        if(!ret && (!m_file_name.empty() && m_camera_id == -1))
+        {
+            m_cap.open(m_file_name.c_str());
+            ret = m_cap.read(frame);
+        }
+        return ret;
+    }
     void handleKey(char key);
     void timerStart();
     void timerEnd();
@@ -482,7 +494,7 @@ App::App(CommandLineParser& cmd)
 
     m_running    = false;
     m_process    = false;
-    m_use_buffer = false;
+    m_use_buffer = true;
 
     m_t0         = 0;
     m_t1         = 0;
@@ -580,7 +592,7 @@ int App::initOpenCL()
             0
         };
 
-        m_context = clCreateContextFromType(props, CL_DEVICE_TYPE_GPU, 0, 0, &res);
+        m_context = clCreateContextFromType(props, CL_DEVICE_TYPE_ALL, 0, 0, &res);
         if (0 == m_context || CL_SUCCESS != res)
             continue;
 
@@ -592,33 +604,43 @@ int App::initOpenCL()
         if (0 == m_queue || CL_SUCCESS != res)
             return -1;
 
-        const char* kernelSrc =
-            "__kernel "
-            "void bitwise_inv_buf_8uC1("
-            "    __global unsigned char* pSrcDst,"
-            "             int            srcDstStep,"
-            "             int            rows,"
-            "             int            cols)"
-            "{"
-            "    int x = get_global_id(0);"
-            "    int y = get_global_id(1);"
-            "    int idx = mad24(y, srcDstStep, x);"
-            "    pSrcDst[idx] = ~pSrcDst[idx];"
-            "}"
-            "__kernel "
-            "void bitwise_inv_img_8uC1("
-            "    read_only  image2d_t srcImg,"
-            "    write_only image2d_t dstImg)"
-            "{"
-            "    int x = get_global_id(0);"
-            "    int y = get_global_id(1);"
-            "    int2 coord = (int2)(x, y);"
-            "    uint4 val = read_imageui(srcImg, coord);"
-            "    val.x = (~val.x) & 0x000000FF;"
-            "    write_imageui(dstImg, coord, val);"
+        m_platformInfo.QueryInfo(m_platform_ids[i]);
+        m_deviceInfo.QueryInfo(m_device_id);
+
+        std::string kernelSrc = "";
+        kernelSrc = kernelSrc                         +
+            "__kernel "                               +
+            "void bitwise_inv_buf_8uC1("              +
+            "    __global unsigned char* pSrcDst,"    +
+            "             int            srcDstStep," +
+            "             int            rows,"       +
+            "             int            cols)"       +
+            "{"                                       +
+            "    int x = get_global_id(0);"           +
+            "    int y = get_global_id(1);"           +
+            "    int idx = mad24(y, srcDstStep, x);"  +
+            "    pSrcDst[idx] = ~pSrcDst[idx];"       +
             "}";
-        size_t len = strlen(kernelSrc);
-        m_program = clCreateProgramWithSource(m_context, 1, &kernelSrc, &len, &res);
+        if (m_deviceInfo.image_support())
+        {
+            kernelSrc = kernelSrc                              +
+                "__kernel "                                    +
+                "void bitwise_inv_img_8uC1("                   +
+                "    read_only  image2d_t srcImg,"             +
+                "    write_only image2d_t dstImg)"             +
+                "{"                                            +
+                "    int x = get_global_id(0);"                +
+                "    int y = get_global_id(1);"                +
+                "    int2 coord = (int2)(x, y);"               +
+                "    uint4 val = read_imageui(srcImg, coord);" +
+                "    val.x = (~val.x) & 0x000000FF;"           +
+                "    write_imageui(dstImg, coord, val);"       +
+                "}";
+        }
+
+        const char *kernelSrc_str = kernelSrc.c_str();
+        size_t len = strlen(kernelSrc_str);
+        m_program = clCreateProgramWithSource(m_context, 1, &kernelSrc_str, &len, &res);
         if (0 == m_program || CL_SUCCESS != res)
             return -1;
 
@@ -630,12 +652,12 @@ int App::initOpenCL()
         if (0 == m_kernelBuf || CL_SUCCESS != res)
             return -1;
 
-        m_kernelImg = clCreateKernel(m_program, "bitwise_inv_img_8uC1", &res);
-        if (0 == m_kernelImg || CL_SUCCESS != res)
-            return -1;
-
-        m_platformInfo.QueryInfo(m_platform_ids[i]);
-        m_deviceInfo.QueryInfo(m_device_id);
+        if (m_deviceInfo.image_support())
+        {
+            m_kernelImg = clCreateKernel(m_program, "bitwise_inv_img_8uC1", &res);
+            if (0 == m_kernelImg || CL_SUCCESS != res)
+                return -1;
+        }
 
         // attach OpenCL context to OpenCV
         cv::ocl::attachContext(m_platformInfo.Name(), m_platform_ids[i], m_context, m_device_id);
