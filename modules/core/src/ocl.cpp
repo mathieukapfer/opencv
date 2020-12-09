@@ -1577,6 +1577,8 @@ struct Device::Impl
             vendorID_ = VENDOR_INTEL;
         else if (vendorName_ == "NVIDIA Corporation")
             vendorID_ = VENDOR_NVIDIA;
+        else if (vendorName_ == "KALRAY Corporation")
+            vendorID_ = VENDOR_KALRAY;
         else
             vendorID_ = UNKNOWN_VENDOR;
 
@@ -4134,6 +4136,8 @@ struct Program::Impl
                 buildflags = joinBuildOptions(buildflags, " -D AMD_DEVICE");
             else if (device.isIntel())
                 buildflags = joinBuildOptions(buildflags, " -D INTEL_DEVICE");
+            else if (device.isKalray())
+                buildflags = joinBuildOptions(buildflags, " -D KALRAY_DEVICE");
             const String param_buildExtraOptions = getBuildExtraOptions();
             if (!param_buildExtraOptions.empty())
                 buildflags = joinBuildOptions(buildflags, param_buildExtraOptions);
