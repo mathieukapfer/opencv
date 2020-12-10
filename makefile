@@ -94,6 +94,6 @@ build/bin/example_opencl_opencl-opencv-interop:
 	cd build/samples/opencl && make
 
 test-opencl-buffer:build/bin/example_opencl_opencl-opencv-interop
-	cd build/bin && ./example_opencl_opencl-opencv-interop --video=../../../opencv_extra/testdata/cv/video/768x576.avi
+	cd build/bin && ./example_opencl_opencl-opencv-interop --video=$(OPENCV_TEST_DATA_PATH)/cv/video/768x576.avi
 
 #kvx-jtag-runner --reset
