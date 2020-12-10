@@ -95,6 +95,6 @@ build/bin/example_opencl_opencl-opencv-interop:
 	cd build/samples/opencl && make
 
 test-opencl-buffer:build/bin/example_opencl_opencl-opencv-interop
-	cd build/bin && ./example_opencl_opencl-opencv-interop --video=$(OPENCV_TEST_DATA_PATH)/cv/video/768x576.avi
+	cd build/bin &&  OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16	OPENCV_OPENCL_DEVICE=':ACCELERATOR:' ./example_opencl_opencl-opencv-interop --video=$(OPENCV_TEST_DATA_PATH)/cv/video/768x576.avi
 
 #kvx-jtag-runner --reset
