@@ -1,26 +1,27 @@
 help:
 	@echo "This is just an helper to quick install, configure, compile and run somes opencv examples"
 	@echo
-	@echo "Prerequis:"
+	@echo " Prerequis:"
+	@echo
+	@echo " - Check the your distribution with"
+	@echo "      make check-install"
 	@echo
 	@echo " - To run on mppa, you need to source the kalray env"
-	@echo "  cd .. && ./get_packages.sh && cd -"
-#	@echo "  source ../kEnv/kvxtools/opt/kalray/accesscore/kalray.sh"
-	@echo "  source ../kEnv/kvxtools/.switch_env"
+	@echo "   Do once (or when you change KAF_LIBRARIES version:"
+	@echo "      cd .. && ./get_packages.sh && cd -"
 	@echo
-	@echo " - follow this link for initial setup"
-	@echo " https://github.com/mathieukapfer/howto/blob/master/howto_install_opencv.md"
+	@echo "   Do on each session:"
+	@echo "      source ../kEnv/kvxtools/.switch_env"
 	@echo
-	@echo " - finalize the dependancies installation with"
-	@echo "  make check-install"
 	@echo
-	@echo "Then, configure and build the opencv lib with: "
-	@echo "  make configure            : create build dir and generate makefile"
-	@echo "  make compile              : compile the opencl lib"
+	@echo " Then, configure and build the opencv lib with: "
+	@echo "      make configure            : create build dir and generate makefile"
+	@echo "      make compile              : compile the opencl lib"
 	@echo
-	@echo "Then, build and run somes examples: "
-	@echo "  make test-opencv_perf_photo-mppa : build & run the 'opencv_perf_photo'"
-	@echo "  make test-opencl-buffer          : build & run the 'example_opencl_opencl-opencv-interop'"
+	@echo " Then, build and run somes examples: "
+	@echo "      make test-opencv_perf_photo-mppa : build & run the 'opencv_perf_photo'"
+	@echo "      make test-opencl-buffer          : build & run the 'example_opencl_opencl-opencv-interop'"
+	@echo
 
 # user setting
 PWM=$(shell pwd)
