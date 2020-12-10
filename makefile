@@ -4,9 +4,9 @@ help:
 	@echo "Prerequis:"
 	@echo
 	@echo " - To run on mppa, you need to source the kalray env"
-	@echo "  cd .. && ./get_packages.sh"
+	@echo "  cd .. && ./get_packages.sh && cd -"
 #	@echo "  source ../kEnv/kvxtools/opt/kalray/accesscore/kalray.sh"
-	@echo "  source kEnv/kvxtools/.switch_env"
+	@echo "  source ../kEnv/kvxtools/.switch_env"
 	@echo
 	@echo " - follow this link for initial setup"
 	@echo " https://github.com/mathieukapfer/howto/blob/master/howto_install_opencv.md"
@@ -50,7 +50,7 @@ opencv_test_bin_path=install
 # WITH_OPENCL                      ON
 configure:
 	mkdir -p build
-	cd build && cmake --debug-find ..   -DCMAKE_BUILD_TYPE=Release \
+	cd build && LD_PRELOAD=${KALRAY_TOOLCHAIN_DIR}/lib/libOpenCL.so cmake --debug-find ..   -DCMAKE_BUILD_TYPE=Release \
                     -DBUILD_EXAMPLES=ON \
 	                  -DBUILD_PERF_TESTS=ON \
                     -DCMAKE_C_FLAGS="$(shell pkg-config --cflags kaf-core)" \
@@ -63,9 +63,9 @@ configure:
                     -DBUILD_TESTS=ON -DBUILD_PERF_TESTS=ON -DINSTALL_TESTS=ON\
                     -DCMAKE_INSTALL_PREFIX=${opencv_prefix}\
                     -DOPENCV_TEST_INSTALL_PATH=${opencv_test_bin_path}\
+                    -DOpenCL_INCLUDE_DIR=$(KALRAY_TOOLCHAIN_DIR)/include \
+                    -DOpenCL_LIBRARY=$(KALRAY_TOOLCHAIN_DIR)/lib/libOpenCL.so \
 
-#                    -DOpenCL_INCLUDE_DIR=$(KALRAY_TOOLCHAIN_DIR)/include \
-#                    -DOpenCL_LIBRARY=$(KALRAY_TOOLCHAIN_DIR)/lib/libOpenCL.so \
 
 # trigger 'configure' the first time target 'compile' is called
 build:
@@ -73,7 +73,7 @@ build:
 
 # build
 compile: build
-	cd build && LD_PRELOAD=${KALRAY_TOOLCHAIN_DIR}/lib/libOpenCL.so make -k -j 4
+	cd build && LD_PRELOAD=${KALRAY_TOOLCHAIN_DIR}/lib/libOpenCL.so	 make -k -j 4
 
 # build and execute
 
@@ -90,8 +90,10 @@ test-opencv_perf_photo-mppa:
 
 
 ## test 'opencl-opencv-interop'
-compile-test-opencl:
+build/bin/example_opencl_opencl-opencv-interop:
 	cd build/samples/opencl && make
 
-test-opencl-buffer:compile-test-opencl
+test-opencl-buffer:build/bin/example_opencl_opencl-opencv-interop
 	cd build/bin && ./example_opencl_opencl-opencv-interop --video=../../../opencv_extra/testdata/cv/video/768x576.avi
+
+#kvx-jtag-runner --reset
