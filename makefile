@@ -2,9 +2,11 @@ help:
 	@echo "This is just an helper to quick install, configure, compile and run somes opencv examples"
 	@echo
 	@echo "Prerequis:"
+	@echo
 	@echo " - To run on mppa, you need to source the kalray env"
-	@echo "  ./get_packages.sh"
-	@echo " source ./kEnv/kvxtools/opt/kalray/accesscore/kalray.sh"
+	@echo "  cd .. && ./get_packages.sh"
+#	@echo "  source ../kEnv/kvxtools/opt/kalray/accesscore/kalray.sh"
+	@echo "  source kEnv/kvxtools/.switch_env"
 	@echo
 	@echo " - follow this link for initial setup"
 	@echo " https://github.com/mathieukapfer/howto/blob/master/howto_install_opencv.md"
@@ -31,7 +33,9 @@ check-install:
 
 # clean
 clean:
-	cd build && make clean
+	rm -rf build;
+
+#cd build && make clean
 
 # configure
 opencv_prefix=install
