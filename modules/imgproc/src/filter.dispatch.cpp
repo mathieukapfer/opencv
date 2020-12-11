@@ -749,6 +749,13 @@ static bool ocl_sepRowFilter2D(const UMat & src, UMat & buf, const Mat & kernelX
     size_t localsize[2] = {16, 16};
 #endif
 
+    // Do not exceed max WG size
+    if ((localsize[0] * localsize[1]) > ocl::Device::getDefault().maxWorkGroupSize())
+    {
+        localsize[0] = ocl::Device::getDefault().maxWorkGroupSize();
+        localsize[1] = 1;
+    }
+
     size_t globalsize[2] = {DIVUP(bufSize.width, localsize[0]) * localsize[0], DIVUP(bufSize.height, localsize[1]) * localsize[1]};
     if (fast8uc1)
         globalsize[0] = DIVUP((bufSize.width + 3) >> 2, localsize[0]) * localsize[0];
@@ -817,6 +824,13 @@ static bool ocl_sepColFilter2D(const UMat & buf, UMat & dst, const Mat & kernelY
     size_t localsize[2] = { 16, 16 };
 #endif
     size_t globalsize[2] = { 0, 0 };
+
+    // Do not exceed max WG size
+    if ((localsize[0] * localsize[1]) > ocl::Device::getDefault().maxWorkGroupSize())
+    {
+        localsize[0] = ocl::Device::getDefault().maxWorkGroupSize();
+        localsize[1] = 1;
+    }
 
     int dtype = dst.type(), cn = CV_MAT_CN(dtype), ddepth = CV_MAT_DEPTH(dtype);
     Size sz = dst.size();

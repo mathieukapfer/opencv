@@ -80,7 +80,9 @@ static bool ocl_fastNlMeansDenoising(InputArray _src, OutputArray _dst, const fl
                                      int templateWindowSize, int searchWindowSize, int normType)
 {
     int type = _src.type(), depth = CV_MAT_DEPTH(type), cn = CV_MAT_CN(type);
-    int ctaSize = ocl::Device::getDefault().isIntel() ? CTA_SIZE_INTEL : CTA_SIZE_DEFAULT;
+    int ctaSize =
+      ocl::Device::getDefault().isIntel() ? CTA_SIZE_INTEL :
+      std::min(ocl::Device::getDefault().maxWorkGroupSize(), static_cast<size_t>(CTA_SIZE_DEFAULT));
     Size size = _src.size();
 
     if (cn < 1 || cn > 4 || ((normType != NORM_L2 || depth != CV_8U) &&
