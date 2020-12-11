@@ -374,7 +374,7 @@ static TransposeInplaceFunc transposeInplaceTab[] =
 static bool ocl_transpose( InputArray _src, OutputArray _dst )
 {
     const ocl::Device & dev = ocl::Device::getDefault();
-    const int TILE_DIM = 32, BLOCK_ROWS = 8;
+    int tile_dim = 32, block_rows = 8;
     int type = _src.type(), cn = CV_MAT_CN(type), depth = CV_MAT_DEPTH(type),
         rowsPerWI = dev.isIntel() ? 4 : 1;
 
@@ -385,6 +385,13 @@ static bool ocl_transpose( InputArray _src, OutputArray _dst )
     String kernelName("transpose");
     bool inplace = dst.u == src.u;
 
+    // Do not exceed max WG size
+    if ((unsigned)(tile_dim * block_rows) > ocl::Device::getDefault().maxWorkGroupSize())
+    {
+        tile_dim = ocl::Device::getDefault().maxWorkGroupSize();
+        block_rows = 1;
+    }
+
     if (inplace)
     {
         CV_Assert(dst.cols == dst.rows);
@@ -393,7 +400,7 @@ static bool ocl_transpose( InputArray _src, OutputArray _dst )
     else
     {
         // check required local memory size
-        size_t required_local_memory = (size_t) TILE_DIM*(TILE_DIM+1)*CV_ELEM_SIZE(type);
+        size_t required_local_memory = (size_t) tile_dim*(tile_dim+1)*CV_ELEM_SIZE(type);
         if (required_local_memory > ocl::Device::getDefault().localMemSize())
             return false;
     }
@@ -401,7 +408,7 @@ static bool ocl_transpose( InputArray _src, OutputArray _dst )
     ocl::Kernel k(kernelName.c_str(), ocl::core::transpose_oclsrc,
                   format("-D T=%s -D T1=%s -D cn=%d -D TILE_DIM=%d -D BLOCK_ROWS=%d -D rowsPerWI=%d%s",
                          ocl::memopTypeToStr(type), ocl::memopTypeToStr(depth),
-                         cn, TILE_DIM, BLOCK_ROWS, rowsPerWI, inplace ? " -D INPLACE" : ""));
+                         cn, tile_dim, block_rows, rowsPerWI, inplace ? " -D INPLACE" : ""));
     if (k.empty())
         return false;
 
@@ -411,8 +418,8 @@ static bool ocl_transpose( InputArray _src, OutputArray _dst )
         k.args(ocl::KernelArg::ReadOnly(src),
                ocl::KernelArg::WriteOnlyNoSize(dst));
 
-    size_t localsize[2]  = { TILE_DIM, BLOCK_ROWS };
-    size_t globalsize[2] = { (size_t)src.cols, inplace ? ((size_t)src.rows + rowsPerWI - 1) / rowsPerWI : (divUp((size_t)src.rows, TILE_DIM) * BLOCK_ROWS) };
+    size_t localsize[2]  = { tile_dim, block_rows };
+    size_t globalsize[2] = { (size_t)src.cols, inplace ? ((size_t)src.rows + rowsPerWI - 1) / rowsPerWI : (divUp((size_t)src.rows, tile_dim) * block_rows) };
 
     if (inplace && dev.isIntel())
     {
