@@ -374,7 +374,7 @@ static TransposeInplaceFunc transposeInplaceTab[] =
 static bool ocl_transpose( InputArray _src, OutputArray _dst )
 {
     const ocl::Device & dev = ocl::Device::getDefault();
-    const int TILE_DIM = 32, BLOCK_ROWS = 8;
+    int TILE_DIM = 32, BLOCK_ROWS = 8;
     int type = _src.type(), cn = CV_MAT_CN(type), depth = CV_MAT_DEPTH(type),
         rowsPerWI = dev.isIntel() ? 4 : 1;
 
@@ -384,6 +384,13 @@ static bool ocl_transpose( InputArray _src, OutputArray _dst )
 
     String kernelName("transpose");
     bool inplace = dst.u == src.u;
+
+    // Do not exceed max WG size
+    if ((unsigned)(TILE_DIM * BLOCK_ROWS) > ocl::Device::getDefault().maxWorkGroupSize())
+    {
+        TILE_DIM = ocl::Device::getDefault().maxWorkGroupSize();
+        BLOCK_ROWS = 1;
+    }
 
     if (inplace)
     {

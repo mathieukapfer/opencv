@@ -343,6 +343,14 @@ static bool extractCovData(InputArray _src, UMat & Dx, UMat & Dy, int depth,
         Dy.create(src.size(), CV_32FC1);
 
         size_t localsize[2] = { (size_t)sobel_lsz, (size_t)sobel_lsz };
+
+        // Do not exceed max WG size
+        if ((localsize[0] * localsize[1]) > ocl::Device::getDefault().maxWorkGroupSize())
+        {
+            localsize[0] = ocl::Device::getDefault().maxWorkGroupSize();
+            localsize[1] = 1;
+        }
+
         size_t globalsize[2] = { localsize[0] * (1 + (src.cols - 1) / localsize[0]),
                                  localsize[1] * (1 + (src.rows - 1) / localsize[1]) };
 

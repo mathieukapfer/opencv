@@ -13,7 +13,9 @@ static void testOpenCLKernel(cv::ocl::Kernel& k)
     cv::UMat src(cv::Size(4096, 2048), CV_8UC1, cv::Scalar::all(100));
     cv::UMat dst(src.size(), CV_8UC1);
     size_t globalSize[2] = {(size_t)src.cols, (size_t)src.rows};
-    size_t localSize[2] = {8, 8};
+    // use preferred workgroup size
+    size_t *localSize = NULL;
+
     int64 kernel_time = k.args(
             cv::ocl::KernelArg::ReadOnlyNoSize(src), // size is not used (similar to 'dst' size)
             cv::ocl::KernelArg::WriteOnly(dst),
