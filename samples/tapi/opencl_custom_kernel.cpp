@@ -135,7 +135,7 @@ int main(int argc, char** argv)
 
         //! [Define kernel parameters and run]
         size_t globalSize[2] = {(size_t)src.cols, (size_t)src.rows};
-        size_t localSize[2] = {8, 8};
+        size_t *localSize = NULL;  // use preferred WG size
         bool executionResult = k
             .args(
                 cv::ocl::KernelArg::ReadOnlyNoSize(src), // size is not used (similar to 'dst' size)

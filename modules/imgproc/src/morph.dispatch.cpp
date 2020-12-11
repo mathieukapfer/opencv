@@ -818,6 +818,13 @@ static bool ocl_morphOp(InputArray _src, OutputArray _dst, InputArray _kernel,
         localThreads[0] = localThreads[1] = 4;
 #endif
 
+    // Do not exceed max WG size
+    if ((localThreads[0] * localThreads[1]) > ocl::Device::getDefault().maxWorkGroupSize())
+    {
+        localThreads[0] = ocl::Device::getDefault().maxWorkGroupSize();
+        localThreads[1] = 1;
+    }
+
     if (localThreads[0]*localThreads[1] * 2 < (localThreads[0] + ksize.width - 1) * (localThreads[1] + ksize.height - 1))
         return false;
 
