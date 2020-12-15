@@ -10,6 +10,14 @@ help:
 	@echo "Then, build & run the sample 'opencl-opencv-interop' with"
 	@echo "  make test-opencl-buffer"
 
+PWD=$(shell pwd)
+OPENCV_TEST_DATA_PATH=$(PWD)/../opencv_extra/testdata
+OPENCV_BIN_PATH=build/bin
+
+COMMON_ENV= \
+	OPENCV_TEST_DATA_PATH=$(OPENCV_TEST_DATA_PATH) \
+	PATH=$(OPENCV_BIN_PATH)
+
 
 # sudo apt list --installed
 check-install:
@@ -19,4 +27,13 @@ build-test-opencl:
 	cd build/samples/opencl && make
 
 test-opencl-buffer:build-test-opencl
-	cd build/bin && ./example_opencl_opencl-opencv-interop --video=../../../opencv_extra/testdata/cv/video/768x576.avi
+	$(COMMON_ENV) \
+	example_opencl_opencl-opencv-interop --video=$(OPENCV_TEST_DATA_PATH)/cv/video/768x576.avi
+
+test-video:
+	$(COMMON_ENV) \
+	opencv_test_video
+
+test-photo:
+	$(COMMON_ENV) \
+	opencv_test_photo
