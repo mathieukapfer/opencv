@@ -51,7 +51,7 @@ opencv_test_bin_path=install
 # WITH_OPENCL                      ON
 configure:
 	mkdir -p build
-	cd build && LD_PRELOAD=${KALRAY_TOOLCHAIN_DIR}/lib/libOpenCL.so cmake --debug-find ..   -DCMAKE_BUILD_TYPE=Release \
+	cd build && LD_PRELOAD=${KALRAY_TOOLCHAIN_DIR}/lib/libOpenCL.so cmake --debug-find .. -DCMAKE_EXPORT_COMPILE_COMMANDS=ON  -DCMAKE_BUILD_TYPE=Release \
                     -DBUILD_EXAMPLES=ON \
 	                  -DBUILD_PERF_TESTS=ON \
                     -DCMAKE_C_FLAGS="$(shell pkg-config --cflags kaf-core)" \
@@ -76,25 +76,106 @@ build:
 compile: build
 	cd build && LD_PRELOAD=${KALRAY_TOOLCHAIN_DIR}/lib/libOpenCL.so	 make -k -j 4
 
-# build and execute
 
-## test 'opencv_perf_photo'
-test-opencv_perf_photo-mppa:
-	OPENCV_TEST_DATA_PATH=$(OPENCV_TEST_DATA_PATH) \
+# ======================================================================================
+
+COMMUN_ENV=	\
   PATH=$(PATH):$(PWD)/build/bin \
   LD_LIBRARY_PATH=$(LD_LIBRARY_PATH):$(PWD)/build/lib \
+	OPENCV_TEST_DATA_PATH=$(OPENCV_TEST_DATA_PATH) \
+
+ENABLE_MPPA=	\
+	OPENCV_OPENCL_DEVICE=':ACCELERATOR:'
+
+ENABLE_GPU=	\
+	OPENCV_OPENCL_DEVICE=':GPU:'
+
+ENABLE_LW_MODE= \
 	POCL_MPPA_FIRMWARE_NAME=ocl_fw_l2_d_1m_hugestack.elf \
 	POCL_MPPA_EXTRA_EXEC_MODE=LW \
 	POCL_MPPA_EXTRA_MAX_WORKGROUP_SIZE=256 \
-	OPENCV_OPENCL_DEVICE=':ACCELERATOR:' \
-	opencv_perf_photo
+
+ENABLE_SPMD_MODE= \
+	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16 \
+
+# ======================================================================================
+## test 'opencv_perf_photo'
+### huge stack (& work groupe size = 256)
+test_perf_photo-mppa-lw:
+	${COMMUN_ENV} \
+	${ENABLE_MPPA} \
+  ${ENABLE_LW_MODE} \
+	opencv_perf_photo --perf_force_samples=1
+
+### work groupe size = 16
+test_perf_photo-mppa:
+	${COMMUN_ENV} \
+	${ENABLE_MPPA} \
+	opencv_perf_photo --perf_force_samples=1
+
+# ======================================================================================
+## perf_video
+### LW mode
+test_perf_video-mppa-lw:
+	${COMMUN_ENV} \
+  ${ENABLE_MPPA} \
+  ${ENABLE_LW_MODE} \
+	opencv_perf_video --perf_force_samples=1
+
+### SMPD mode & work groupe size = 16
+test_perf_video-mppa-spmd:
+	${COMMUN_ENV} \
+  ${ENABLE_MPPA} \
+	${ENABLE_SPMD_MODE} \
+	opencv_perf_video --perf_force_samples=1
+
+### non mppa
+test_perf_video-gpu:
+	${COMMUN_ENV} \
+	${ENABLE_GPU} \
+	opencv_perf_video --perf_force_samples=1
+
+# ======================================================================================
+## test 'opencl-opencv-interop'
+test-photo-lw:build/bin/opencv_test_photo
+	${ENABLE_LW_MODE} \
+	${COMMUN_ENV} \
+	opencv_test_photo
+
+test-photo:build/bin/opencv_test_photo
+	${COMMUN_ENV} \
+	opencv_test_photo
 
 
+# ======================================================================================
+## test video
+test-video:build/bin/opencv_test_video
+	${COMMUN_ENV} \
+	${ENABLE_MPPA} \
+	${ENABLE_SPMD_MODE} \
+	opencv_test_video
+
+# ======================================================================================
+## test video
+test-calib:build/bin/opencv_test_video
+	${COMMUN_ENV} \
+  opencv_test_calib3d
+
+# ======================================================================================
 ## test 'opencl-opencv-interop'
 build/bin/example_opencl_opencl-opencv-interop:
 	cd build/samples/opencl && make
 
+### enable POCL trace
+POCL_DEBUG=1
+#POCL_DEBUG=0
+
+### work groupe size = 256
 test-opencl-buffer:build/bin/example_opencl_opencl-opencv-interop
-	cd build/bin &&  OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16	OPENCV_OPENCL_DEVICE=':ACCELERATOR:' ./example_opencl_opencl-opencv-interop --video=$(OPENCV_TEST_DATA_PATH)/cv/video/768x576.avi
+	cd build/bin &&  POCL_DEBUG=${POCL_DEBUG}	OPENCV_OPENCL_DEVICE=':ACCELERATOR:' ./example_opencl_opencl-opencv-interop --video=$(OPENCV_TEST_DATA_PATH)/cv/video/768x576.avi
+
+### work groupe size = 16
+test-opencl-buffer-16:build/bin/example_opencl_opencl-opencv-interop
+	cd build/bin &&  POCL_DEBUG=${POCL_DEBUG} OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16	OPENCV_OPENCL_DEVICE=':ACCELERATOR:' ./example_opencl_opencl-opencv-interop --video=$(OPENCV_TEST_DATA_PATH)/cv/video/768x576.avi
 
 #kvx-jtag-runner --reset
