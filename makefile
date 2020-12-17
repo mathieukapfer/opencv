@@ -1,31 +1,46 @@
+PWM=$(shell pwd)
+
+# default user settings
+OPENCV_TEST_DATA_PATH?="/work2/common/embedded/KAF/KAF_libraries/opencv/4.5.0/opencv_extra/testdata"
+
 help:
-	@echo "This is just an helper to quick install, configure, compile and run somes opencv examples"
+	@echo "======================="
+	@echo "   Welcome to helper   "
+	@echo "======================="
 	@echo
-	@echo " Prerequis:"
+	@echo "It will help you to quick install, configure, compile and run some opencv examples"
 	@echo
-	@echo " - Check the your distribution with"
+	@echo "Initial setup: "
+	@echo " - Check your distribution:"
 	@echo "      make check-install"
 	@echo
-	@echo " - To run on mppa, you need to source the kalray env"
-	@echo "   Do once (or when you change KAF_LIBRARIES version:"
+	@echo "Initial setup [kalray dev mode only]:"
+	@echo " - Source the kalray env"
+	@echo "   Do once (or when you change KAF_LIBRARIES version)"
 	@echo "      cd .. && ./get_packages.sh && cd -"
 	@echo
 	@echo "   Do on each session:"
 	@echo "      source ../kEnv/kvxtools/.switch_env"
 	@echo
 	@echo
-	@echo " Then, configure and build the opencv lib with: "
+	@echo " Configure and build the opencv lib with: "
 	@echo "      make configure            : create build dir and generate makefile"
 	@echo "      make compile              : compile the opencl lib"
 	@echo
-	@echo " Then, build and run somes examples: "
-	@echo "      make test-opencv_perf_photo-mppa : build & run the 'opencv_perf_photo'"
-	@echo "      make test-opencl-buffer          : build & run the 'example_opencl_opencl-opencv-interop'"
+	@echo " Then, build and run "
 	@echo
+	@echo "    Functional and Perf test: "
+	@echo
+	@echo "      make test_list            : list of binary "
+	@echo "      make test_<binary>        : execute test on mppa with default conf "
+	@echo "      make test_<binary>_lw     : execute test on mppa with LW conf [experimental only]"
+	@echo
+	@echo "    Some examples: "
+	@echo "      make test-opencl-buffer   : build & run the 'example_opencl_opencl-opencv-interop'"
+	@echo
+	@echo " You can change the opencv data path with OPENCV_TEST_DATA_PATH env variable"
+	@echo " Current value: $(OPENCV_TEST_DATA_PATH)"
 
-# user setting
-PWM=$(shell pwd)
-OPENCV_TEST_DATA_PATH= "/work2/common/embedded/KAF/KAF_libraries/opencv/4.5.0/opencv_extra/testdata"
 
 # check dependencies
 #  (sudo apt list --installed)
@@ -84,98 +99,60 @@ COMMUN_ENV=	\
   LD_LIBRARY_PATH=$(LD_LIBRARY_PATH):$(PWD)/build/lib \
 	OPENCV_TEST_DATA_PATH=$(OPENCV_TEST_DATA_PATH) \
 
-ENABLE_MPPA=	\
+ENABLE_MPPA_DEFAULT_MODE=	\
 	OPENCV_OPENCL_DEVICE=':ACCELERATOR:'
 
 ENABLE_GPU=	\
 	OPENCV_OPENCL_DEVICE=':GPU:'
 
-ENABLE_LW_MODE= \
+ENABLE_MPPA_IN_LW_MODE= \
+	OPENCV_OPENCL_DEVICE=':ACCELERATOR:' \
 	POCL_MPPA_FIRMWARE_NAME=ocl_fw_l2_d_1m_hugestack.elf \
 	POCL_MPPA_EXTRA_EXEC_MODE=LW \
 	POCL_MPPA_EXTRA_MAX_WORKGROUP_SIZE=256 \
 
-ENABLE_SPMD_MODE= \
+ENABLE_MPPA_IN_SPMD_MODE= \
+	OPENCV_OPENCL_DEVICE=':ACCELERATOR:' \
 	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16 \
 
 # ======================================================================================
-## test 'opencv_perf_photo'
-### huge stack (& work groupe size = 256)
-test_perf_photo-mppa-lw:
-	${COMMUN_ENV} \
-	${ENABLE_MPPA} \
-  ${ENABLE_LW_MODE} \
-	opencv_perf_photo --perf_force_samples=1
+FORCE_SAMPLE=1
 
-### work groupe size = 16
-test_perf_photo-mppa:
-	${COMMUN_ENV} \
-	${ENABLE_MPPA} \
-	opencv_perf_photo --perf_force_samples=1
+test_list:
+	ls build/bin | egrep "opencv_test|opencv_perf"
 
-# ======================================================================================
-## perf_video
-### LW mode
-test_perf_video-mppa-lw:
+test_%: build/bin/%
+	@echo
+	@echo " Run $< in SPMD configuration"
+	@echo
 	${COMMUN_ENV} \
-  ${ENABLE_MPPA} \
-  ${ENABLE_LW_MODE} \
-	opencv_perf_video --perf_force_samples=1
+	${ENABLE_MPPA_IN_SPMD_MODE} \
+	$< --perf_force_samples=$(FORCE_SAMPLE)
 
-### SMPD mode & work groupe size = 16
-test_perf_video-mppa-spmd:
+test_%_lw: build/bin/%
+	@echo
+	@echo " Run $< in LW configuration [Experimental ONLY]"
+	@echo
 	${COMMUN_ENV} \
-  ${ENABLE_MPPA} \
-	${ENABLE_SPMD_MODE} \
-	opencv_perf_video --perf_force_samples=1
-
-### non mppa
-test_perf_video-gpu:
-	${COMMUN_ENV} \
-	${ENABLE_GPU} \
-	opencv_perf_video --perf_force_samples=1
-
-# ======================================================================================
-## test 'opencl-opencv-interop'
-test-photo-lw:build/bin/opencv_test_photo
-	${ENABLE_LW_MODE} \
-	${COMMUN_ENV} \
-	opencv_test_photo
-
-test-photo:build/bin/opencv_test_photo
-	${COMMUN_ENV} \
-	opencv_test_photo
+  ${ENABLE_MPPA_IN_LW_MODE} \
+	$< --perf_force_samples=$(FORCE_SAMPLE)
 
 
 # ======================================================================================
-## test video
-test-video:build/bin/opencv_test_video
-	${COMMUN_ENV} \
-	${ENABLE_MPPA} \
-	${ENABLE_SPMD_MODE} \
-	opencv_test_video
-
-# ======================================================================================
-## test video
-test-calib:build/bin/opencv_test_video
-	${COMMUN_ENV} \
-  opencv_test_calib3d
-
-# ======================================================================================
-## test 'opencl-opencv-interop'
-build/bin/example_opencl_opencl-opencv-interop:
-	cd build/samples/opencl && make
 
 ### enable POCL trace
-POCL_DEBUG=1
-#POCL_DEBUG=0
+#POCL_DEBUG=1
+POCL_DEBUG=0
 
 ### work groupe size = 256
 test-opencl-buffer:build/bin/example_opencl_opencl-opencv-interop
-	cd build/bin &&  POCL_DEBUG=${POCL_DEBUG}	OPENCV_OPENCL_DEVICE=':ACCELERATOR:' ./example_opencl_opencl-opencv-interop --video=$(OPENCV_TEST_DATA_PATH)/cv/video/768x576.avi
+	${COMMUN_ENV} \
+	example_opencl_opencl-opencv-interop --video=$(OPENCV_TEST_DATA_PATH)/cv/video/768x576.avi
 
 ### work groupe size = 16
-test-opencl-buffer-16:build/bin/example_opencl_opencl-opencv-interop
-	cd build/bin &&  POCL_DEBUG=${POCL_DEBUG} OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16	OPENCV_OPENCL_DEVICE=':ACCELERATOR:' ./example_opencl_opencl-opencv-interop --video=$(OPENCV_TEST_DATA_PATH)/cv/video/768x576.avi
+test-opencl-buffer-mppa-spmd:build/bin/example_opencl_opencl-opencv-interop
+	${COMMUN_ENV} \
+	${ENABLE_MPPA_IN_SPMD_MODE} \
+	POCL_DEBUG=${POCL_DEBUG} example_opencl_opencl-opencv-interop --video=$(OPENCV_TEST_DATA_PATH)/cv/video/768x576.avi
 
 #kvx-jtag-runner --reset
