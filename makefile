@@ -1,7 +1,7 @@
 PWM=$(shell pwd)
 
 # default user settings
-OPENCV_TEST_DATA_PATH?="/work2/common/embedded/KAF/KAF_libraries/opencv/4.5.0/opencv_extra/testdata"
+OPENCV_TEST_DATA_PATH?="${PWD}/../opencv_extra/testdata"
 
 help:
 	@echo "======================="
@@ -64,9 +64,17 @@ opencv_test_bin_path=install
 # INSTALL_BIN_EXAMPLES             ON
 # OPENCL_FOUND                     ON
 # WITH_OPENCL                      ON
+
+#CMAKE_BUILD_TYPE=Debug
+#OPENCV_TRACE
+#OPENCV_TRACE_SYNC_OPENCL
+#ENABLE_INSTRUMENTATION
+
 configure:
 	mkdir -p build
-	cd build && LD_PRELOAD=${KALRAY_TOOLCHAIN_DIR}/lib/libOpenCL.so cmake --debug-find .. -DCMAKE_EXPORT_COMPILE_COMMANDS=ON  -DCMAKE_BUILD_TYPE=Release \
+	cd build && LD_PRELOAD=${KALRAY_TOOLCHAIN_DIR}/lib/libOpenCL.so cmake --debug-find ..  \
+										-DCMAKE_EXPORT_COMPILE_COMMANDS=ON  \
+										-DCMAKE_BUILD_TYPE=Release \
                     -DBUILD_EXAMPLES=ON \
 	                  -DBUILD_PERF_TESTS=ON \
                     -DCMAKE_C_FLAGS="$(shell pkg-config --cflags kaf-core)" \
@@ -79,8 +87,6 @@ configure:
                     -DBUILD_TESTS=ON -DBUILD_PERF_TESTS=ON -DINSTALL_TESTS=ON\
                     -DCMAKE_INSTALL_PREFIX=${opencv_prefix}\
                     -DOPENCV_TEST_INSTALL_PATH=${opencv_test_bin_path}\
-                    -DOpenCL_INCLUDE_DIR=$(KALRAY_TOOLCHAIN_DIR)/include \
-                    -DOpenCL_LIBRARY=$(KALRAY_TOOLCHAIN_DIR)/lib/libOpenCL.so \
 
 
 # trigger 'configure' the first time target 'compile' is called
@@ -89,7 +95,10 @@ build:
 
 # build
 compile: build
-	cd build && LD_PRELOAD=${KALRAY_TOOLCHAIN_DIR}/lib/libOpenCL.so	 make -k -j 4
+	cd build &&	make -k -j 4
+
+#compile: build
+#	cd build && LD_PRELOAD=${KALRAY_TOOLCHAIN_DIR}/lib/libOpenCL.so	 make -k -j 4
 
 
 # ======================================================================================
@@ -121,22 +130,37 @@ FORCE_SAMPLE=1
 test_list:
 	ls build/bin | egrep "opencv_test|opencv_perf"
 
-test_%: build/bin/%
+test_gpu_%: build/bin/opencv_%
 	@echo
-	@echo " Run $< in SPMD configuration"
+	@echo " Run $< as GPU device"
+	@echo
+	${COMMUN_ENV} \
+	${ENABLE_GPU} \
+	$< --perf_force_samples=$(FORCE_SAMPLE)
+
+
+test_mppa_%: build/bin/opencv_%
+	@echo
+	@echo " Run $< as MPPA device in SPMD configuration"
 	@echo
 	${COMMUN_ENV} \
 	${ENABLE_MPPA_IN_SPMD_MODE} \
 	$< --perf_force_samples=$(FORCE_SAMPLE)
 
-test_%_lw: build/bin/%
+test_mppa_%_lw: build/bin/opencv_%
 	@echo
-	@echo " Run $< in LW configuration [Experimental ONLY]"
+	@echo " Run $< as MPPA device in LW configuration [Experimental ONLY]"
 	@echo
 	${COMMUN_ENV} \
   ${ENABLE_MPPA_IN_LW_MODE} \
 	$< --perf_force_samples=$(FORCE_SAMPLE)
 
+
+build/bin/opencv_perf_%:
+	cd build/modules/$* && make $(notdir $@)
+
+build/bin/opencv_test_%:
+	cd build/modules/$* && make $(notdir $@)
 
 # ======================================================================================
 
