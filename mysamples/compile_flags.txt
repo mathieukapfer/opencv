@@ -1,0 +1,17 @@
+-I/home/kapfer/Project/opencv/include
+-I/home/kapfer/Project/opencv/modules/core/include
+-I/home/kapfer/Project/opencv/modules/flann/include
+-I/home/kapfer/Project/opencv/modules/imgproc/include
+-I/home/kapfer/Project/opencv/modules/ml/include
+-I/home/kapfer/Project/opencv/modules/photo/include
+-I/home/kapfer/Project/opencv/modules/dnn/include
+-I/home/kapfer/Project/opencv/modules/features2d/include
+-I/home/kapfer/Project/opencv/modules/imgcodecs/include
+-I/home/kapfer/Project/opencv/modules/videoio/include
+-I/home/kapfer/Project/opencv/modules/calib3d/include
+-I/home/kapfer/Project/opencv/modules/highgui/include
+-I/home/kapfer/Project/opencv/modules/objdetect/include
+-I/home/kapfer/Project/opencv/modules/stitching/include
+-I/home/kapfer/Project/opencv/modules/ts/include
+-I/home/kapfer/Project/opencv/modules/video/include
+-I/home/kapfer/Project/opencv/modules/gapi/include
