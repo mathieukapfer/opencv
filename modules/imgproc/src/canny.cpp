@@ -147,8 +147,8 @@ static bool ocl_Canny(InputArray _src, const UMat& dx_, const UMat& dy_, OutputA
 
     if (lSizeY == 0)
     {
-        lSizeX = 16;
-        lSizeY = max_wg_size / 16;
+        lSizeX = 4;
+        lSizeY = max_wg_size / 4;
     }
     if (lSizeY == 0)
     {
