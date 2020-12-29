@@ -1,0 +1,161 @@
+-*- mode: compilation; default-directory: "~/Project/opencv/mysamples/" -*-
+Compilation started at Tue Dec 29 08:39:38
+
+make transparent_api
+cd build && make
+make[1] : on entre dans le répertoire « /home/kapfer/Project/opencv/mysamples/build »
+make[2] : on entre dans le répertoire « /home/kapfer/Project/opencv/mysamples/build »
+make[3] : on entre dans le répertoire « /home/kapfer/Project/opencv/mysamples/build »
+make[3] : on quitte le répertoire « /home/kapfer/Project/opencv/mysamples/build »
+[ 20%] Built target my_example
+make[3] : on entre dans le répertoire « /home/kapfer/Project/opencv/mysamples/build »
+make[3] : on quitte le répertoire « /home/kapfer/Project/opencv/mysamples/build »
+[ 40%] Built target my_example_filter
+make[3] : on entre dans le répertoire « /home/kapfer/Project/opencv/mysamples/build »
+make[3] : on quitte le répertoire « /home/kapfer/Project/opencv/mysamples/build »
+[ 60%] Built target transparent_api
+make[3] : on entre dans le répertoire « /home/kapfer/Project/opencv/mysamples/build »
+make[3] : on quitte le répertoire « /home/kapfer/Project/opencv/mysamples/build »
+[ 80%] Built target opencv_example
+make[3] : on entre dans le répertoire « /home/kapfer/Project/opencv/mysamples/build »
+make[3] : on quitte le répertoire « /home/kapfer/Project/opencv/mysamples/build »
+[100%] Built target mandelbrote
+make[2] : on quitte le répertoire « /home/kapfer/Project/opencv/mysamples/build »
+make[1] : on quitte le répertoire « /home/kapfer/Project/opencv/mysamples/build »
+OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16  \
+./build/transparent_api /home/kapfer/Project/opencv/mysamples/../samples/data/graf3.png
+Start
+Use UMAT => trigger transparent api mode
+[ INFO:0] global /home/kapfer/Project/opencv/modules/core/src/ocl.cpp (1182) haveOpenCL Initialize OpenCL runtime...
+[ INFO:0] global /home/kapfer/Project/opencv/modules/core/src/ocl.cpp (1188) haveOpenCL OpenCL: found 2 platforms
+[ INFO:0] global /home/kapfer/Project/opencv/modules/core/src/ocl.cpp (980) getInitializedExecutionContext OpenCL: initializing thread execution context
+[ INFO:0] global /home/kapfer/Project/opencv/modules/core/src/ocl.cpp (990) getInitializedExecutionContext OpenCL: creating new execution context...
+0.093065 [93065303] OpenCV(OpenCL:0): clGetPlatformIDs_pfn(0, __null, &numPlatforms)
+0.093094 [93094289] OpenCV(OpenCL:0): clGetPlatformIDs_pfn(numPlatforms, &platforms[0], &numPlatforms)
+0.093230 [93230304] OpenCV(OpenCL:0): getStringInfo(clGetDeviceInfo_pfn, devices[i], 0x102B, name)
+0.093293 [93293185] OpenCV(OpenCL:0): clGetDeviceInfo_pfn(d, 0x1031, sizeof(cl_platform_id), &pl, __null)
+0.138837 [138836892] OpenCV(OpenCL:0): clCreateContext
+[ WARN:0] global /home/kapfer/Project/opencv/modules/core/src/ocl.cpp (1600) _init OpenCL: using workgroup size: 16 (was 1024)
+0.139073 [139072701] OpenCV(OpenCL:0): clRetainDevice(device)
+0.139078 [139078368] OpenCV(OpenCL:0): clReleaseDevice((cl_device_id)d)
+0.139236 [139235689] OpenCV(OpenCL:0): handle = clCreateCommandQueue_pfn(ch, dh, props, &retval)
+[ INFO:0] global /home/kapfer/Project/opencv/modules/core/src/ocl.cpp (1008) getInitializedExecutionContext OpenCL: device=GeForce GTX 560 Ti
+[ INFO:0] global /home/kapfer/Project/opencv/modules/core/src/ocl.cpp (5110) __init_buffer_pools OpenCL: Initializing buffer pool for context@0 with max capacity: poolSize=0 poolSizeHostPtr=0
+0.139378 [139378472] OpenCV(OpenCL:0): clCreateBuffer(capacity=1572864) => 0x556d453c7e20
+0.140054 [140054028] OpenCV(OpenCL:0): clEnqueueWriteBuffer(q, handle=0x556d453c7e20, CL_TRUE, offset=0, sz=1536000, data=0x7fbc09962040, 0, 0, 0)
+0.136355 [136354952] main:57
+0.140197 [140196976] OpenCV(OpenCL:0): clCreateBuffer(capacity=512000) => 0x556d453c90f0
+[DEBUG:0] global /home/kapfer/Project/opencv/modules/core/src/ocl.cpp (320) OpenCLBinaryCacheConfigurator Initializing OpenCL cache configuration...
+[ INFO:0] global /home/kapfer/Project/opencv/modules/core/src/ocl.cpp (406) OpenCLBinaryCacheConfigurator Successfully initialized OpenCL cache directory: /home/kapfer/.cache/opencv/4.5/opencl_cache/
+[ INFO:0] global /home/kapfer/Project/opencv/modules/core/src/ocl.cpp (430) prepareCacheDirectoryForContext Preparing OpenCL cache configuration for context: NVIDIA_Corporation--GeForce_GTX_560_Ti--390_138
+0.142209 [142208855] OpenCV(OpenCL:0): clBuildProgram(binary: imgproc/color_rgb)
+0.142225 [142224539] OpenCV(OpenCL:0): result = clGetProgramBuildInfo_pfn(handle, devices[0], 0x1181, sizeof(build_status), &build_status, &retsz)
+0.142290 [142290125] OpenCV(OpenCL:0): clCreateKernel('RGB2Gray')
+0.142308 [142307634] OpenCV(OpenCL:0): clSetKernelArg('RGB2Gray', arg_index=0, cl_mem=0x556d453c7e20)
+0.142313 [142313342] OpenCV(OpenCL:0): clSetKernelArg('RGB2Gray', arg_index=1, step_value=2400)
+0.142318 [142317643] OpenCV(OpenCL:0): clSetKernelArg('RGB2Gray', arg_index=2, offset_value=0)
+0.142327 [142326791] OpenCV(OpenCL:0): clSetKernelArg('RGB2Gray', arg_index=3, cl_mem=0x556d453c90f0)
+0.142332 [142331516] OpenCV(OpenCL:0): clSetKernelArg('RGB2Gray', arg_index=4, step_value=800)
+0.142335 [142334863] OpenCV(OpenCL:0): clSetKernelArg('RGB2Gray', arg_index=5, offset_value=0)
+0.142338 [142338001] OpenCV(OpenCL:0): clSetKernelArg('RGB2Gray', arg_index=6, rows_value=640)
+0.142341 [142341148] OpenCV(OpenCL:0): clSetKernelArg('RGB2Gray', arg_index=7, cols_value=800)
+0.142553 [142552834] OpenCV(OpenCL:0): clEnqueueNDRangeKernel('RGB2Gray', dims=2, globalsize=1024x640x1, localsize=NULL) sync=false
+0.142571 [142571226] OpenCV(OpenCL:0): clSetEventCallback(asyncEvent, CL_COMPLETE, oclCleanupCallback, this)
+0.142576 [142576272] OpenCV(OpenCL:0): clReleaseEvent_pfn(asyncEvent)
+0.138806 [138805653] main:59
+0.142934 [142933879] OpenCV(OpenCL:0): clEnqueueReadBuffer(q, handle=0x556d453c90f0, CL_TRUE, 0, sz=512000, data=0x556d45413200, 0, 0, 0)
+0.143127 [143127146] OpenCV(OpenCL:0): clEnqueueWriteBuffer(q, handle=0x556d453c90f0, CL_TRUE, 0, sz=512000, data=0x556d45413200, 0, 0, 0)
+0.143305 [143305294] OpenCV(OpenCL:0): clCreateBuffer(capacity=2097152) => 0x556d453ca8e0
+0.143776 [143776430] OpenCV(OpenCL:0): clBuildProgram(binary: imgproc/filterSepRow)
+0.143785 [143785033] OpenCV(OpenCL:0): result = clGetProgramBuildInfo_pfn(handle, devices[0], 0x1181, sizeof(build_status), &build_status, &retsz)
+0.143811 [143811438] OpenCV(OpenCL:0): clCreateKernel('row_filter_C1_D0')
+0.143822 [143821868] OpenCV(OpenCL:0): clSetKernelArg('row_filter_C1_D0', arg_index=0, cl_mem=0x556d453c90f0)
+0.143837 [143837038] OpenCV(OpenCL:0): clSetKernelArg('row_filter_C1_D0', arg_index=1, size=4, value=0x7ffd2e2302fc)
+0.143843 [143843454] OpenCV(OpenCL:0): clSetKernelArg('row_filter_C1_D0', arg_index=2, size=4, value=0x7ffd2e2301a0)
+0.143864 [143864464] OpenCV(OpenCL:0): clSetKernelArg('row_filter_C1_D0', arg_index=3, size=4, value=0x7ffd2e2301a4)
+0.143874 [143873912] OpenCV(OpenCL:0): clSetKernelArg('row_filter_C1_D0', arg_index=4, size=4, value=0x7ffd2e23052c)
+0.143880 [143879588] OpenCV(OpenCL:0): clSetKernelArg('row_filter_C1_D0', arg_index=5, size=4, value=0x7ffd2e230528)
+0.143885 [143885030] OpenCV(OpenCL:0): clSetKernelArg('row_filter_C1_D0', arg_index=6, size=4, value=0x7ffd2e2301a8)
+0.143890 [143890428] OpenCV(OpenCL:0): clSetKernelArg('row_filter_C1_D0', arg_index=7, size=4, value=0x7ffd2e2301ac)
+0.143897 [143896571] OpenCV(OpenCL:0): clSetKernelArg('row_filter_C1_D0', arg_index=8, cl_mem=0x556d453ca8e0)
+0.143907 [143907242] OpenCV(OpenCL:0): clSetKernelArg('row_filter_C1_D0', arg_index=9, size=4, value=0x7ffd2e2302cc)
+0.143913 [143913276] OpenCV(OpenCL:0): clSetKernelArg('row_filter_C1_D0', arg_index=10, size=4, value=0x7ffd2e2304cc)
+0.143919 [143918668] OpenCV(OpenCL:0): clSetKernelArg('row_filter_C1_D0', arg_index=11, size=4, value=0x7ffd2e2304c8)
+0.143928 [143928500] OpenCV(OpenCL:0): clSetKernelArg('row_filter_C1_D0', arg_index=12, size=4, value=0x7ffd2e23022c)
+0.144082 [144082468] OpenCV(OpenCL:0): clEnqueueNDRangeKernel('row_filter_C1_D0', dims=2, globalsize=208x646x1, localsize=16x1x1) sync=false
+0.144094 [144093920] OpenCV(OpenCL:0): clSetEventCallback(asyncEvent, CL_COMPLETE, oclCleanupCallback, this)
+0.144098 [144097990] OpenCV(OpenCL:0): clReleaseEvent_pfn(asyncEvent)
+0.144148 [144147626] OpenCV(OpenCL:0): clReleaseKernel_pfn(handle)
+0.144298 [144298173] OpenCV(OpenCL:0): clBuildProgram(binary: imgproc/filterSepCol)
+0.144306 [144306278] OpenCV(OpenCL:0): result = clGetProgramBuildInfo_pfn(handle, devices[0], 0x1181, sizeof(build_status), &build_status, &retsz)
+0.144323 [144322685] OpenCV(OpenCL:0): clCreateKernel('col_filter')
+0.144337 [144336932] OpenCV(OpenCL:0): clSetKernelArg('col_filter', arg_index=0, cl_mem=0x556d453ca8e0)
+0.144351 [144351437] OpenCV(OpenCL:0): clSetKernelArg('col_filter', arg_index=1, step_value=3200)
+0.144356 [144356111] OpenCV(OpenCL:0): clSetKernelArg('col_filter', arg_index=2, offset_value=0)
+0.144370 [144369783] OpenCV(OpenCL:0): clSetKernelArg('col_filter', arg_index=3, rows_value=646)
+0.144374 [144373634] OpenCV(OpenCL:0): clSetKernelArg('col_filter', arg_index=4, cols_value=800)
+0.144381 [144380616] OpenCV(OpenCL:0): clSetKernelArg('col_filter', arg_index=5, cl_mem=0x556d453c90f0)
+0.144385 [144385371] OpenCV(OpenCL:0): clSetKernelArg('col_filter', arg_index=6, step_value=800)
+0.144391 [144391046] OpenCV(OpenCL:0): clSetKernelArg('col_filter', arg_index=7, offset_value=0)
+0.144399 [144398842] OpenCV(OpenCL:0): clSetKernelArg('col_filter', arg_index=8, rows_value=640)
+0.144413 [144413467] OpenCV(OpenCL:0): clSetKernelArg('col_filter', arg_index=9, cols_value=800)
+0.144425 [144424610] OpenCV(OpenCL:0): clSetKernelArg('col_filter', arg_index=10, size=4, value=0x7ffd2e23035c)
+0.144452 [144451956] OpenCV(OpenCL:0): clEnqueueNDRangeKernel('col_filter', dims=2, globalsize=800x640x1, localsize=16x1x1) sync=false
+0.144463 [144462641] OpenCV(OpenCL:0): clSetEventCallback(asyncEvent, CL_COMPLETE, oclCleanupCallback, this)
+0.144469 [144469160] OpenCV(OpenCL:0): clReleaseEvent_pfn(asyncEvent)
+0.140693 [140693463] main:60
+0.144477 [144477288] OpenCV(OpenCL:0): clReleaseKernel_pfn(handle)
+0.144882 [144882003] OpenCV(OpenCL:0): clBuildProgram(binary: imgproc/canny)
+0.144891 [144890593] OpenCV(OpenCL:0): result = clGetProgramBuildInfo_pfn(handle, devices[0], 0x1181, sizeof(build_status), &build_status, &retsz)
+0.144910 [144910404] OpenCV(OpenCL:0): clCreateKernel('stage1_with_sobel')
+0.144926 [144925514] OpenCV(OpenCL:0): clCreateBuffer(capacity=2097152) => 0x556d454aa670
+0.144941 [144940606] OpenCV(OpenCL:0): clSetKernelArg('stage1_with_sobel', arg_index=0, cl_mem=0x556d453c90f0)
+0.144948 [144948279] OpenCV(OpenCL:0): clSetKernelArg('stage1_with_sobel', arg_index=1, step_value=800)
+0.144955 [144955149] OpenCV(OpenCL:0): clSetKernelArg('stage1_with_sobel', arg_index=2, offset_value=0)
+0.144962 [144961614] OpenCV(OpenCL:0): clSetKernelArg('stage1_with_sobel', arg_index=3, rows_value=640)
+0.144968 [144968119] OpenCV(OpenCL:0): clSetKernelArg('stage1_with_sobel', arg_index=4, cols_value=800)
+0.144977 [144976829] OpenCV(OpenCL:0): clSetKernelArg('stage1_with_sobel', arg_index=5, cl_mem=0x556d454aa670)
+0.144984 [144983524] OpenCV(OpenCL:0): clSetKernelArg('stage1_with_sobel', arg_index=6, step_value=3200)
+0.144990 [144990171] OpenCV(OpenCL:0): clSetKernelArg('stage1_with_sobel', arg_index=7, offset_value=0)
+0.144999 [144998899] OpenCV(OpenCL:0): clSetKernelArg('stage1_with_sobel', arg_index=8, size=4, value=0x7ffd2e23067c)
+0.145007 [145006674] OpenCV(OpenCL:0): clSetKernelArg('stage1_with_sobel', arg_index=9, size=4, value=0x7ffd2e230678)
+0.145160 [145160191] OpenCV(OpenCL:0): clEnqueueNDRangeKernel('stage1_with_sobel', dims=2, globalsize=800x640x1, localsize=4x4x1) sync=false
+0.145173 [145173470] OpenCV(OpenCL:0): clSetEventCallback(asyncEvent, CL_COMPLETE, oclCleanupCallback, this)
+0.145179 [145178879] OpenCV(OpenCL:0): clReleaseEvent_pfn(asyncEvent)
+0.145225 [145225232] OpenCV(OpenCL:0): clReleaseKernel_pfn(handle)
+0.146178 [146177915] OpenCV(OpenCL:0): clBuildProgram(binary: imgproc/canny)
+0.146187 [146186932] OpenCV(OpenCL:0): result = clGetProgramBuildInfo_pfn(handle, devices[0], 0x1181, sizeof(build_status), &build_status, &retsz)
+0.146207 [146206758] OpenCV(OpenCL:0): clCreateKernel('stage2_hysteresis')
+0.146220 [146220341] OpenCV(OpenCL:0): clSetKernelArg('stage2_hysteresis', arg_index=0, cl_mem=0x556d454aa670)
+0.146228 [146227661] OpenCV(OpenCL:0): clSetKernelArg('stage2_hysteresis', arg_index=1, step_value=3200)
+0.146235 [146234895] OpenCV(OpenCL:0): clSetKernelArg('stage2_hysteresis', arg_index=2, offset_value=0)
+0.146242 [146241669] OpenCV(OpenCL:0): clSetKernelArg('stage2_hysteresis', arg_index=3, rows_value=640)
+0.146248 [146248427] OpenCV(OpenCL:0): clSetKernelArg('stage2_hysteresis', arg_index=4, cols_value=800)
+0.146273 [146273026] OpenCV(OpenCL:0): clEnqueueNDRangeKernel('stage2_hysteresis', dims=2, globalsize=800x80x1, localsize=4x1x1) sync=false
+0.146285 [146284807] OpenCV(OpenCL:0): clSetEventCallback(asyncEvent, CL_COMPLETE, oclCleanupCallback, this)
+0.146290 [146290023] OpenCV(OpenCL:0): clReleaseEvent_pfn(asyncEvent)
+0.146297 [146296929] OpenCV(OpenCL:0): clReleaseKernel_pfn(handle)
+0.147704 [147704432] OpenCV(OpenCL:0): clBuildProgram(binary: imgproc/canny)
+0.147713 [147712768] OpenCV(OpenCL:0): result = clGetProgramBuildInfo_pfn(handle, devices[0], 0x1181, sizeof(build_status), &build_status, &retsz)
+0.147730 [147730176] OpenCV(OpenCL:0): clCreateKernel('getEdges')
+0.147742 [147742086] OpenCV(OpenCL:0): clSetKernelArg('getEdges', arg_index=0, cl_mem=0x556d454aa670)
+0.147749 [147748919] OpenCV(OpenCL:0): clSetKernelArg('getEdges', arg_index=1, step_value=3200)
+0.147756 [147755621] OpenCV(OpenCL:0): clSetKernelArg('getEdges', arg_index=2, offset_value=0)
+0.147762 [147762351] OpenCV(OpenCL:0): clSetKernelArg('getEdges', arg_index=3, rows_value=640)
+0.147769 [147768887] OpenCV(OpenCL:0): clSetKernelArg('getEdges', arg_index=4, cols_value=800)
+0.147777 [147776890] OpenCV(OpenCL:0): clSetKernelArg('getEdges', arg_index=5, cl_mem=0x556d453c90f0)
+0.147783 [147782993] OpenCV(OpenCL:0): clSetKernelArg('getEdges', arg_index=6, step_value=800)
+0.147790 [147789600] OpenCV(OpenCL:0): clSetKernelArg('getEdges', arg_index=7, offset_value=0)
+0.147813 [147813282] OpenCV(OpenCL:0): clEnqueueNDRangeKernel('getEdges', dims=2, globalsize=1024x80x1, localsize=NULL) sync=false
+0.147824 [147824049] OpenCV(OpenCL:0): clSetEventCallback(asyncEvent, CL_COMPLETE, oclCleanupCallback, this)
+0.147829 [147829127] OpenCV(OpenCL:0): clReleaseEvent_pfn(asyncEvent)
+0.144058 [144057781] main:61
+0.147864 [147864087] OpenCV(OpenCL:0): clReleaseKernel_pfn(handle)
+0.147867 [147866658] OpenCV(OpenCL:0): clReleaseKernel_pfn(handle)
+0.148047 [148047230] OpenCV(OpenCL:0): clEnqueueReadBuffer(q, handle=0x556d453c90f0, CL_TRUE, 0, sz=512000, data=0x556d45413200, 0, 0, 0)
+Gtk-Message: 08:39:38.836: Failed to load module "canberra-gtk-module"
+0.166876 [166876352] OpenCV(OpenCL:0): clEnqueueWriteBuffer(q, handle=0x556d453c90f0, CL_TRUE, 0, sz=512000, data=0x556d45413200, 0, 0, 0)
+1.154616 [1154615770] OpenCV(OpenCL:0): clReleaseMemObject_pfn(entry.clBuffer_)
+1.154832 [1154832496] OpenCV(OpenCL:0): clReleaseMemObject_pfn(entry.clBuffer_)
+
+Compilation finished at Tue Dec 29 08:39:39
