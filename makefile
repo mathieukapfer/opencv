@@ -1,7 +1,8 @@
 PWM=$(shell pwd)
 
 # default user settings
-OPENCV_TEST_DATA_PATH?="${PWD}/../opencv_extra/testdata"
+#OPENCV_TEST_DATA_PATH?="${PWD}/../opencv_extra/testdata"
+OPENCV_TEST_DATA_PATH?="/work2/common/embedded/KAF/KAF_libraries/opencv/4.5.0/opencv_extra/testdata/"
 
 help:
 	@echo "======================="
@@ -105,11 +106,13 @@ clinfo:
 	LD_PRELOAD=${KALRAY_TOOLCHAIN_DIR}/lib/libOpenCL.so	 clinfo
 
 # ======================================================================================
+#POCL_MPPA_EXTRA_BUILD_CFLAGS='-O0 -g'
 
 COMMUN_ENV=	\
   PATH=$(PATH):$(PWD)/build/bin \
   LD_LIBRARY_PATH=$(LD_LIBRARY_PATH):$(PWD)/build/lib \
 	OPENCV_TEST_DATA_PATH=$(OPENCV_TEST_DATA_PATH) \
+	POCL_CACHE_DIR=$(PWM)/.cache/pocl \
 
 ENABLE_MPPA_DEFAULT_MODE=	\
 	OPENCV_OPENCL_DEVICE=':ACCELERATOR:'
@@ -122,16 +125,27 @@ ENABLE_MPPA_IN_LW_MODE= \
 	POCL_MPPA_FIRMWARE_NAME=ocl_fw_l2_d_1m_hugestack.elf \
 	POCL_MPPA_EXTRA_EXEC_MODE=LW \
 	POCL_MPPA_EXTRA_MAX_WORKGROUP_SIZE=256 \
+  POCL_MPPA_EXTRA_BUILD_CFLAGS=$(POCL_MPPA_EXTRA_BUILD_CFLAGS) \
 
 ENABLE_MPPA_IN_SPMD_MODE= \
 	OPENCV_OPENCL_DEVICE=':ACCELERATOR:' \
 	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16 \
+  POCL_MPPA_EXTRA_BUILD_CFLAGS=$(POCL_MPPA_EXTRA_BUILD_CFLAGS) \
 
 # ======================================================================================
-FORCE_SAMPLE=1
+FORCE_SAMPLE:=1
+#POCL_DEBUG=all
+#POCL_DEBUG=1
+#POCL_DEBUG=0
+
+.PHONY:test_list
 
 test_list:
 	ls build/bin | egrep "opencv_test|opencv_perf"
+
+test_mppa_all_test:
+	ls build/bin/opencv_test_* > test_list
+	make	$(foreach bin,  $(wildcard build/bin/opencv_test_*), $(bin:build/bin/opencv_%=test_mppa_%) )
 
 test_gpu_%: build/bin/opencv_%
 	@echo
@@ -139,8 +153,8 @@ test_gpu_%: build/bin/opencv_%
 	@echo
 	${COMMUN_ENV} \
 	${ENABLE_GPU} \
-	$< --perf_force_samples=$(FORCE_SAMPLE)
-
+	$< --perf_force_samples=$(FORCE_SAMPLE) \
+	--gtest_filter="*CL*"
 
 test_mppa_%: build/bin/opencv_%
 	@echo
@@ -148,7 +162,9 @@ test_mppa_%: build/bin/opencv_%
 	@echo
 	${COMMUN_ENV} \
 	${ENABLE_MPPA_IN_SPMD_MODE} \
-	$< --perf_force_samples=$(FORCE_SAMPLE)
+	POCL_DEBUG=$(POCL_DEBUG) \
+	$< --perf_force_samples=$(FORCE_SAMPLE) \
+	--gtest_filter="*CL*"
 
 test_mppa_%_lw: build/bin/opencv_%
 	@echo
@@ -156,8 +172,28 @@ test_mppa_%_lw: build/bin/opencv_%
 	@echo
 	${COMMUN_ENV} \
   ${ENABLE_MPPA_IN_LW_MODE} \
-	$< --perf_force_samples=$(FORCE_SAMPLE)
+	$< --perf_force_samples=$(FORCE_SAMPLE) \
+	--gtest_filter="*CL*"
 
+test_perf: build/bin/opencv_perf_photo
+	@echo
+	@echo " Run $< as MPPA device in SPMD configuration"
+	@echo
+	${COMMUN_ENV} \
+	${ENABLE_MPPA_IN_SPMD_MODE} \
+	POCL_DEBUG=1 \
+	$< --perf_force_samples=$(FORCE_SAMPLE) \
+	--gtest_filter="OCL_Photo_DenoisingColored.DenoisingColored"
+
+test_perf_gpu: build/bin/opencv_perf_photo
+	@echo
+	@echo " Run $< as MPPA device in SPMD configuration"
+	@echo
+	${COMMUN_ENV} \
+	${ENABLE_GPU} \
+	POCL_DEBUG=1 \
+	$< --perf_force_samples=$(FORCE_SAMPLE) \
+	--gtest_filter="OCL_Photo_DenoisingColored.DenoisingColored"
 
 build/bin/opencv_perf_%:
 	cd build/modules/$* && make $(notdir $@)
@@ -166,10 +202,50 @@ build/bin/opencv_test_%:
 	cd build/modules/$* && make $(notdir $@)
 
 # ======================================================================================
+# WIP
 
 ### enable POCL trace
-#POCL_DEBUG=1
-POCL_DEBUG=0
+# options
+
+
+#GDB_ENABLE=gdb --args
+#VALGRING=valgrind
+#TIME=time
+
+test_ok_:
+	@echo
+	@echo " SPECIAL CONF !!!! "
+	@echo "Run $< in SPMD configuration"
+	@echo
+	${COMMUN_ENV} \
+  ${ENABLE_MPPA_IN_LW_MODE} \
+	${TIME} ${VALGRING} opencv_perf_core --perf_force_samples=$(FORCE_SAMPLE) \
+	--gtest_filter="*OCL_*"
+
+test_ok:
+	@echo
+	@echo " SPECIAL CONF !!!! "
+	@echo
+	${COMMUN_ENV} \
+  ${ENABLE_MPPA_IN_LW_MODE} \
+	POCL_DEBUG=${POCL_DEBUG} \
+	${GDB_ENABLE}	\
+	${VALGRING} opencv_perf_core --perf_force_samples=$(FORCE_SAMPLE) \
+	--gtest_filter="-*OCL_BufferPoolFixture_BufferPool_UMatCanny*"
+
+test_ko:
+	@echo
+	@echo " SPECIAL CONF !!!! "
+	@echo
+	${COMMUN_ENV} \
+  ${ENABLE_MPPA_IN_SPMD_MODE} \
+	POCL_DEBUG=${POCL_DEBUG} \
+	${GDB_ENABLE} opencv_perf_core --perf_force_samples=$(FORCE_SAMPLE) \
+	--gtest_filter="*OCL_BufferPoolFixture_BufferPool_UMatCanny10*"
+
+
+# ======================================================================================
+
 
 ### work groupe size = 256
 test-opencl-buffer:build/bin/example_opencl_opencl-opencv-interop
