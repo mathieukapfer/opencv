@@ -1,16 +1,34 @@
+
 //source https://www.learnopencv.com/opencv-transparent-api/
 
 #include "opencv2/core.hpp"
+#include "opencv2/core/cvdef.h"
 #include "opencv2/core/utils/logger.hpp"
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/imgproc.hpp"
+#include <bits/stdint-intn.h>
+#include <iomanip>
 #include <iostream>
 #include <ostream>
 using namespace cv;
 
 #define DEFAULT_IMAGE "lena.jpg"
 #define USE_TRANSPARENT_API
+
+#define TIMESTAMP_START                                                 \
+  static int64 tick_ref = (int64)cv::getTickCount();                    \
+  std::cout << "Start" << std::endl;
+
+#define TIMESTAMP                                                       \
+  {                                                                     \
+    int64 tick = (int64)cv::getTickCount();                             \
+    double t = double(tick - tick_ref) / cv::getTickFrequency();        \
+    std::cout << std::fixed << std::setprecision(6) << t << " ["        \
+              << std::fixed << std::setprecision(6) << tick - tick_ref  \
+              << "] " << __FUNCTION__ << ":" << __LINE__ << std::endl;   \
+  }
+
 
 int main(int argc, char *argv[]) {
   cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_DEBUG);
@@ -25,6 +43,8 @@ int main(int argc, char *argv[]) {
     image = argv[1];
   }
 
+  TIMESTAMP_START;
+
 #ifndef USE_TRANSPARENT_API
   Mat img, gray;
   img = imread(image, cv::IMREAD_COLOR);
@@ -34,16 +54,11 @@ int main(int argc, char *argv[]) {
   String filename(image);
   imread(filename, cv::IMREAD_COLOR).copyTo(img);
 #endif
-  // - time measurment init
-  double t = (double)cv::getTickCount();
+  TIMESTAMP;
 
-  cvtColor(img, gray, COLOR_BGR2GRAY);
-  GaussianBlur(gray, gray, Size(7, 7), 1.5);
-  Canny(gray, gray, 0, 50);
-
-  // - time measurment
-  t = ((double)cv::getTickCount() - t) / cv::getTickFrequency();
-  std::cout << "Times passed in seconds: " << t << std::endl;
+  cvtColor(img, gray, COLOR_BGR2GRAY); TIMESTAMP;
+  GaussianBlur(gray, gray, Size(7, 7), 1.5); TIMESTAMP;
+  Canny(gray, gray, 0, 50); TIMESTAMP;
 
   imshow("edges", gray);
   waitKey();
