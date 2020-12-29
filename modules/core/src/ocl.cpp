@@ -39,7 +39,9 @@
 //
 //M*/
 
+#include "opencv2/core/cvdef.h"
 #include "precomp.hpp"
+#include <iomanip>
 
 #ifndef HAVE_OPENCL
 #include "ocl_disabled.impl.hpp"
@@ -150,11 +152,19 @@ static bool isRaiseError()
 }
 #endif
 
+static int64 GLOBAL_TICK_REF = cv::getTickCount();
+
 #if CV_OPENCL_TRACE_CHECK
 static inline
 void traceOpenCLCheck(cl_int status, const char* message)
 {
-    std::cout << "OpenCV(OpenCL:" << status << "): " << message << std::endl << std::flush;
+  int64 tick = cv::getTickCount();
+  double t = (double) (tick - GLOBAL_TICK_REF) / cv::getTickFrequency();
+  // GLOBAL_TICK_REF = tick;
+
+  std::cout << std::fixed << std::setprecision(6) << t << " ["
+            << std::fixed << std::setprecision(6) << tick - GLOBAL_TICK_REF << "] "
+            <<  "OpenCV(OpenCL:" << status << "): " << message << std::endl << std::flush;
 }
 #define CV_OCL_TRACE_CHECK_RESULT(status, message) traceOpenCLCheck(status, message)
 #else
