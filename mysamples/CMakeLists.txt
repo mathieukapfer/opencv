@@ -62,3 +62,10 @@ add_executable(transparent_api transparent_api.cpp)
 
 # Link your application with OpenCV libraries
 target_link_libraries(transparent_api PRIVATE ${OpenCV_LIBS})
+
+
+# Declare the executable target built from your sources
+add_executable(opencl_custom_kernel opencl_custom_kernel.cpp)
+
+# Link your application with OpenCV libraries
+target_link_libraries(opencl_custom_kernel PRIVATE ${OpenCV_LIBS})

@@ -100,6 +100,9 @@ compile: build
 #compile: build
 #	cd build && LD_PRELOAD=${KALRAY_TOOLCHAIN_DIR}/lib/libOpenCL.so	 make -k -j 4
 
+# check mppa detection
+clinfo:
+	LD_PRELOAD=${KALRAY_TOOLCHAIN_DIR}/lib/libOpenCL.so	 clinfo
 
 # ======================================================================================
 

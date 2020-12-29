@@ -31,14 +31,14 @@ using namespace cv;
 
 
 int main(int argc, char *argv[]) {
-  cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_DEBUG);
+  //cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_DEBUG);
+  cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_INFO);
 
   const char default_image_file[] = DEFAULT_IMAGE;
   const char * image = default_image_file;
 
   if(argc < 2) {
-    std::cout << std::endl << "  Usage: " << argv[0] << " <image>" << std::endl << std::endl;
-    exit(-1);
+    std::cout << std::endl << "  Usage: " << argv[0] << " [<image>] " << std::endl << std::endl;
   } else {
     image = argv[1];
   }
