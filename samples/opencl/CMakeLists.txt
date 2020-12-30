@@ -1,5 +1,7 @@
 ocv_install_example_src(opencl *.cpp *.hpp CMakeLists.txt)
 
+ADD_COMPILE_OPTIONS("-g")
+
 # cmake 3.1 needed for find_package(OpenCL)
 if(CMAKE_VERSION VERSION_LESS "3.1")
   message(STATUS "OpenCL samples require CMakes 3.1+")
