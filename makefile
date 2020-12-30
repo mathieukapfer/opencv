@@ -145,7 +145,25 @@ test_list:
 
 test_mppa_all_test:
 	ls build/bin/opencv_test_* > test_list
-	make	$(foreach bin,  $(wildcard build/bin/opencv_test_*), $(bin:build/bin/opencv_%=test_mppa_%) )
+	make -k	$(foreach bin,  $(wildcard build/bin/opencv_test_*), $(bin:build/bin/opencv_%=test_mppa_%) ) | tee $@__.log
+	grep "Run build/bin/\|PASSED\|FAILED\|=========="  $@__.log
+
+test_gpu_all_test:
+	ls build/bin/opencv_test_* > test_list
+	make -k	$(foreach bin,  $(wildcard build/bin/opencv_test_*), $(bin:build/bin/opencv_%=test_gpu_%) ) | tee $@__.log
+	grep "Run build/bin/\|PASSED\|FAILED\|=========="  $@__.log
+
+test_mppa_all_perf:
+	ls build/bin/opencv_perf_* > perf_list
+	make -k	$(foreach bin,  $(wildcard build/bin/opencv_perf_*), $(bin:build/bin/opencv_%=test_mppa_%) ) | tee $@__.log
+	grep "Run build/bin/\|PASSED\|FAILED\|PERFSTAT\|RUN\|=========="  $@__.log
+	grep "Run build/bin/\|PASSED\|FAILED\|=========="  $@__.log
+
+test_gpu_all_perf:
+	ls build/bin/opencv_perf_* > perf_list
+	make -k	$(foreach bin,  $(wildcard build/bin/opencv_perf_*), $(bin:build/bin/opencv_%=test_gpu_%) ) | tee $@__.log
+	grep "Run build/bin/\|PASSED\|FAILED\|PERFSTAT\|RUN\|=========="  $@__.log
+	grep "Run build/bin/\|PASSED\|FAILED\|=========="  $@__.log
 
 test_gpu_%: build/bin/opencv_%
 	@echo
