@@ -247,6 +247,9 @@ test_ko:
 # ======================================================================================
 
 
+build/bin/example_opencl_opencl-opencv-interop:
+	cd build/samples/opencl && make
+
 ### work groupe size = 256
 test-opencl-buffer:build/bin/example_opencl_opencl-opencv-interop
 	${COMMUN_ENV} \
