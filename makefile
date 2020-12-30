@@ -143,9 +143,29 @@ FORCE_SAMPLE:=1
 test_list:
 	ls build/bin | egrep "opencv_test|opencv_perf"
 
+test_gpu_all_test:
+	ls build/bin/opencv_test_* > test_list
+	make $(foreach bin,  $(wildcard build/bin/opencv_test_*), $(bin:build/bin/opencv_%=test_gpu_%) )
+
 test_mppa_all_test:
 	ls build/bin/opencv_test_* > test_list
-	make	$(foreach bin,  $(wildcard build/bin/opencv_test_*), $(bin:build/bin/opencv_%=test_mppa_%) )
+	make $(foreach bin,  $(wildcard build/bin/opencv_test_*), $(bin:build/bin/opencv_%=test_mppa_%))
+
+test_gpu_all_perf:
+	ls build/bin/opencv_perf_* > perf_list
+	make  $(foreach bin,  $(wildcard build/bin/opencv_perf_*), $(bin:build/bin/opencv_%=test_gpu_%) )
+
+test_mppa_all_perf:
+	ls build/bin/opencv_perf_* > perf_list
+	make -k	$(foreach bin,  $(wildcard build/bin/opencv_perf_*), $(bin:build/bin/opencv_%=test_mppa_%) )
+
+
+test_mppa_perf_imgproc:build/bin/opencv_perf_imgproc
+	${COMMUN_ENV} \
+	${ENABLE_MPPA_IN_SPMD_MODE} \
+	POCL_DEBUG=$(POCL_DEBUG) \
+	$< --perf_force_samples=$(FORCE_SAMPLE) \
+	--gtest_filter="-OCL_SqrBoxFilterFixture_SqrBoxFilter.SqrBoxFilter*"
 
 test_gpu_%: build/bin/opencv_%
 	@echo
@@ -175,13 +195,26 @@ test_mppa_%_lw: build/bin/opencv_%
 	$< --perf_force_samples=$(FORCE_SAMPLE) \
 	--gtest_filter="*CL*"
 
+#--gtest_filter="-OCL_SqrBoxFilterFixture_SqrBoxFilter.SqrBoxFilter/6:OCL_SqrBoxFilterFixture_SqrBoxFilter.SqrBoxFilter/14"
+
+# --gtest_filter="OCL_AKAZE/Feature2DFixture"
+
+# --gtest_filter="OCL_ImgprocWarp*"
+# --gtest_filter="OCL_ImgprocWarp/Remap_INTER_NEAREST.Mat/120"
+#	--gtest_filter="*OCL_Imgproc*"
+# --gtest_filter="OCL_ImageProc/SepFilter2D.Mat_BitExact/120"
+# --gtest_filter="OCL_ImageProc/SepFilter2D.Mat_BitExact*"
+# --gtest_filter="OCL_ImageProc*"
+
+#--gtest_filter="OCL_ImageProc/MatchTemplate.Mat*:OCL_Imgproc/CLAHETest.Accuracy*:OCL_ImageProc/SepFilter2D.Mat_BitExact/66"
+
 test_perf: build/bin/opencv_perf_photo
 	@echo
 	@echo " Run $< as MPPA device in SPMD configuration"
 	@echo
 	${COMMUN_ENV} \
 	${ENABLE_MPPA_IN_SPMD_MODE} \
-	POCL_DEBUG=1 \
+	POCL_DEBUG=$(POCL_DEBUG) \
 	$< --perf_force_samples=$(FORCE_SAMPLE) \
 	--gtest_filter="OCL_Photo_DenoisingColored.DenoisingColored"
 
@@ -191,7 +224,6 @@ test_perf_gpu: build/bin/opencv_perf_photo
 	@echo
 	${COMMUN_ENV} \
 	${ENABLE_GPU} \
-	POCL_DEBUG=1 \
 	$< --perf_force_samples=$(FORCE_SAMPLE) \
 	--gtest_filter="OCL_Photo_DenoisingColored.DenoisingColored"
 
