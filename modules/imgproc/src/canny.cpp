@@ -250,7 +250,7 @@ static bool ocl_Canny(InputArray _src, const UMat& dx_, const UMat& dy_, OutputA
             return false;
     }
 
-    int PIX_PER_WI = 8;
+    int PIX_PER_WI = 4;
     /*
         stage2:
             hysteresis (add weak edges if they are connected with strong edges)
