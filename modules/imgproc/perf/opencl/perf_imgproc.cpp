@@ -45,7 +45,10 @@
 //M*/
 
 #include "../perf_precomp.hpp"
+#include "opencv2/core/utils/logger.hpp"
+#include "opencv2/ts.hpp"
 #include "opencv2/ts/ocl_perf.hpp"
+#include <iostream>
 
 namespace opencv_test {
 namespace ocl {
@@ -302,7 +305,9 @@ typedef TestBaseWithParam<CannyParams> CannyFixture;
 
 OCL_PERF_TEST_P(CannyFixture, Canny, ::testing::Combine(OCL_TEST_SIZES, OCL_PERF_ENUM(3, 5), Bool()))
 {
-    const CannyParams& params = GetParam();
+  cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_INFO);
+
+  const CannyParams& params = GetParam();
     cv::Size imgSize = get<0>(params);
     int apertureSize = get<1>(params);
     bool L2Grad = get<2>(params);
