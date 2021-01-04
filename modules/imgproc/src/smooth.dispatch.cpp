@@ -322,9 +322,15 @@ static bool ocl_GaussianBlur_8UC1(InputArray _src, OutputArray _dst, Size ksize,
     const ocl::Device & dev = ocl::Device::getDefault();
     int type = _src.type(), sdepth = CV_MAT_DEPTH(type), cn = CV_MAT_CN(type);
 
+    std::cout << (!dev.isIntel() && (type == CV_8UC1)) << std::endl;
+    std::cout << ((_src.offset() == 0) && (_src.step() % 4 == 0)) << std::endl;
+    std::cout << ((ksize.width == 5 && (_src.cols() % 4 == 0))) << std::endl;
+    std::cout << ((ksize.width == 3 && (_src.cols() % 16 == 0) && (_src.rows() % 2 == 0)))  << std::endl;
+
+    if (!( !(dev.isIntel() && (type == CV_8UC1) &&
          (_src.offset() == 0) && (_src.step() % 4 == 0) &&
          ((ksize.width == 5 && (_src.cols() % 4 == 0)) ||
-         (ksize.width == 3 && (_src.cols() % 16 == 0) && (_src.rows() % 2 == 0)))) )
+          (ksize.width == 3 && (_src.cols() % 16 == 0) && (_src.rows() % 2 == 0)))) ))
         return false;
 
     Mat kernelX = _kernelX.getMat().reshape(1, 1);
