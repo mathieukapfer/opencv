@@ -36,7 +36,7 @@ help:
 	@echo "      make test_<binary>        : execute test on mppa with default conf "
 	@echo "      make test_<binary>_lw     : execute test on mppa with LW conf [experimental only]"
 	@echo
-	@echo "    Some examples: "
+	@echo "    Others examples: "
 	@echo "      make test-opencl-buffer   : build & run the 'example_opencl_opencl-opencv-interop'"
 	@echo
 	@echo " You can change the opencv data path with OPENCV_TEST_DATA_PATH env variable"
@@ -229,6 +229,36 @@ build/bin/opencv_test_%:
 #GDB_ENABLE=gdb --args
 #VALGRING=valgrind
 #TIME=time
+
+perf_canny_gpu: build_perf_canny
+	@echo
+	@echo
+	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16 \
+	${COMMUN_ENV} \
+  ${ENABLE_GPU} \
+	${TIME} ${VALGRING} opencv_perf_imgproc --perf_force_samples=$(FORCE_SAMPLE) \
+	--gtest_filter="*CL_CannyFixture_Canny.Canny*"
+
+build_perf_canny:
+	cd build && make opencv_perf_imgproc
+
+run_perf_canny_gpu_:
+	for i in {0..15} ; do \
+	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16 \
+	${COMMUN_ENV} \
+  ${ENABLE_GPU} \
+	${TIME} ${VALGRING} opencv_perf_imgproc --perf_force_samples=$(FORCE_SAMPLE) \
+	--gtest_filter="*CL_CannyFixture_Canny.Canny/$$i"; \
+	done
+
+SHELL := bash
+#.ONESHELL:
+loop:
+	@echo
+	@echo $$SHELL
+	for i in {1..5} ; do \
+	  echo $$i; \
+  done
 
 test_ok_:
 	@echo
