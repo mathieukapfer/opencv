@@ -13,7 +13,7 @@
 #include <ostream>
 using namespace cv;
 
-#define DEFAULT_IMAGE "lena.jpg"
+#define DEFAULT_IMAGE "../lena.jpg"
 #define USE_TRANSPARENT_API
 
 #define TIMESTAMP_START                                                 \
@@ -39,6 +39,7 @@ int main(int argc, char *argv[]) {
 
   if(argc < 2) {
     std::cout << std::endl << "  Usage: " << argv[0] << " [<image>] " << std::endl << std::endl;
+    std::cout << std::endl << "  Use default image: " << image  << std::endl;
   } else {
     image = argv[1];
   }
@@ -46,21 +47,34 @@ int main(int argc, char *argv[]) {
   TIMESTAMP_START;
 
 #ifndef USE_TRANSPARENT_API
-  Mat img, gray;
+  Mat img, gray, gray2, gray3;
   img = imread(image, cv::IMREAD_COLOR);
 #else
+  UMat img, gray, gray2, gray3;;
   std::cout << "Use UMAT => trigger transparent api mode" << std::endl;
-  UMat img, gray;
   String filename(image);
   imread(filename, cv::IMREAD_COLOR).copyTo(img);
 #endif
+
+  std::cout << "image size ori:" << img.size() << std::endl;
+
+  TIMESTAMP;
+  imshow("ori", img);
+
+  std::cout << "cvtColor" << std::endl;
+  cvtColor(img, gray, COLOR_BGR2GRAY);
+  imshow("gray", gray);
   TIMESTAMP;
 
-  cvtColor(img, gray, COLOR_BGR2GRAY); TIMESTAMP;
-  GaussianBlur(gray, gray, Size(7, 7), 1.5); TIMESTAMP;
-  Canny(gray, gray, 0, 50); TIMESTAMP;
+  std::cout << "GaussianBlur" << std::endl;
+  std::cout << "image size gray:" << gray.size() << std::endl;
+  GaussianBlur(gray, gray2, Size(3, 3), 1.5);
+  TIMESTAMP;
 
-  imshow("edges", gray);
+  std::cout << "Canny" << std::endl;
+  Canny(gray2, gray3, 0, 50); TIMESTAMP;
+
+  imshow("edges", gray3);
   waitKey();
 
   return 0;
