@@ -4631,6 +4631,10 @@ Program Context::Impl::getProg(const ProgramSource& src,
             src_->module_.c_str(), src_->name_.c_str(), src_->sourceHash_.c_str(),
             getPrefixString().c_str(),
             buildflags.c_str());
+    std::cout
+      << "----------------------  " << std::endl
+      << "build info:" << std::endl << key << std::endl
+      << "----------------------  " << std::endl;
     {
         cv::AutoLock lock(program_cache_mutex);
         phash_t::iterator it = phash.find(key);

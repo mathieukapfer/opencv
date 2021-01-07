@@ -1,14 +1,15 @@
 PWD=$(shell pwd)
 OpenCV_DIR=$(PWD)/../build
 OpenCV_SRC=$(PWD)/..
+OpenCV_Extra_Data=$(PWD)/../../opencv_extra/testdata/cv
 
 # helper
 # ----------
 help:
 	@echo
 	@echo " configure: create build dir for compilation"
-	@echo " compile:   compile all targets"
-	@echo " run_<prg>: execute program"
+	@echo " compile:   build all targets"
+	@echo " <prg>:     build & execute one program"
 	@echo
 
 # configure
@@ -47,20 +48,25 @@ RUN_ENV=$(RUN_ENV_GPU)
 ## run target
 ## ----------
 
-run_%: build/%
-	cd build && make $*
-	$(RUN_ENV) \
-	./build/$*
-
-
 #IMAGE=$(OpenCV_SRC)/samples/data/graf3.png
-transparent_api: build/$@
+#IMAGE=$(OpenCV_Extra_Data)/shared/fruits.png
+#IMAGE=$(OpenCV_Extra_Data)/shared/baboon.png
+IMAGE=$(OpenCV_Extra_Data)/shared/1_itseez-0001438.png
+#IMAGE=$(OpenCV_Extra_Data)/../gpu/stereobm/aloe-L.png
+
+
+## specific target
+transparent_api: opencv_imgproc build/$@
 	cd build && make $*
 	$(RUN_ENV) \
 	./build/$@ $(IMAGE)
 
-
-opencl_custom_kernel: build/$@
+## generic target
+%: build/%
 	cd build && make $*
 	$(RUN_ENV) \
-	./build/$@
+	./build/$*
+
+## dependencies
+opencv_imgproc:
+	cd ../build/modules/imgproc/ && make $@

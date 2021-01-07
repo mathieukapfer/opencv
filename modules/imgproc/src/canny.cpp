@@ -44,6 +44,7 @@
 #include "opencl_kernels_imgproc.hpp"
 #include "opencv2/core/hal/intrin.hpp"
 #include <deque>
+#include <iostream>
 
 #include "opencv2/core/openvx/ovx_defs.hpp"
 
@@ -250,7 +251,7 @@ static bool ocl_Canny(InputArray _src, const UMat& dx_, const UMat& dy_, OutputA
             return false;
     }
 
-    int PIX_PER_WI = 8;
+    int PIX_PER_WI = 4;
     /*
         stage2:
             hysteresis (add weak edges if they are connected with strong edges)
@@ -825,6 +826,11 @@ void Canny( InputArray _src, OutputArray _dst,
                 int aperture_size, bool L2gradient )
 {
     CV_INSTRUMENT_REGION();
+
+    std::cout << __FILE__ << ":" << __LINE__ << ":" << __FUNCTION__ << " called with "
+      "src size: " << _src.size() << "dst size: " << _dst.size() <<
+      ", low_thresh: " << low_thresh << ", high_thresh: " << high_thresh <<
+      ", aperture_size: " << aperture_size << ", L2gradient: " << L2gradient << std::endl;
 
     CV_Assert( _src.depth() == CV_8U );
 
