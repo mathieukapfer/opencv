@@ -165,6 +165,14 @@ test_mppa_all_perf:
 	grep "Run build/bin/\|PASSED\|FAILED\|PERFSTAT\|RUN\|=========="  $@__.log
 	grep "Run build/bin/\|PASSED\|FAILED\|=========="  $@__.log
 
+check_failed:
+	cat test_mppa_all_perf.log test_mppa_all_test.log  | grep  "Run build/bin/\|FAILED"
+
+check_pbwgsize_%:
+	grep "INVALID_WORK_GROUP_SIZE" test_mppa_all_$*.log  | sed "s/.*clEnqueueNDRangeKernel(\(.*\))/\1/" | sed "s/globalsize=.*,//" | sort -u
+
+checl_pbwgsize_all:
+	cat  test_mppa_all_perf.log test_mppa_all_test.log  | grep "INVALID_WORK_GROUP_SIZE"| sed "s/.*clEnqueueNDRangeKernel(\(.*\))/\1/" | sed "s/globalsize=.*,//" | sort -u
 
 test_mppa_perf_imgproc:build/bin/opencv_perf_imgproc
 	${COMMUN_ENV} \
