@@ -267,6 +267,15 @@ perf_canny_gpu: build_perf_canny
 	${TIME} ${VALGRING} opencv_perf_imgproc --perf_force_samples=$(FORCE_SAMPLE) \
 	--gtest_filter="*CL_CannyFixture_Canny.Canny*"
 
+perf_canny_mppa: build_perf_canny
+	@echo
+	@echo
+	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16 \
+	${COMMUN_ENV} \
+  ${ENABLE_MPPA_IN_SPMD_MODE} \
+	${TIME} ${VALGRING} opencv_perf_imgproc --perf_force_samples=$(FORCE_SAMPLE) \
+	--gtest_filter="*CL_CannyFixture_Canny.Canny*"
+
 build_perf_canny:
 	cd build && make opencv_perf_imgproc
 
