@@ -137,6 +137,8 @@ FORCE_SAMPLE:=1
 #POCL_DEBUG=all
 #POCL_DEBUG=1
 #POCL_DEBUG=0
+POCL_DEBUG=timing
+
 
 .PHONY:test_list
 
@@ -271,6 +273,7 @@ perf_canny_mppa: build_perf_canny
 	@echo
 	@echo
 	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16 \
+	POCL_DEBUG=$(POCL_DEBUG) \
 	${COMMUN_ENV} \
   ${ENABLE_MPPA_IN_SPMD_MODE} \
 	${TIME} ${VALGRING} opencv_perf_imgproc --perf_force_samples=$(FORCE_SAMPLE) \
@@ -282,6 +285,7 @@ build_perf_canny:
 run_perf_canny_gpu_:
 	for i in {0..15} ; do \
 	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16 \
+	POCL_DEBUG=$(POCL_DEBUG) \
 	${COMMUN_ENV} \
   ${ENABLE_GPU} \
 	${TIME} ${VALGRING} opencv_perf_imgproc --perf_force_samples=$(FORCE_SAMPLE) \
