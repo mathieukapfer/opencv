@@ -79,11 +79,34 @@ __constant int next[4][2] = {
 
 inline float3 sobel(int idx, __local const floatN *smem)
 {
-    // result: x, y, mag
+  // result: x, y, mag
     float3 res;
 
+    /* if GRP_SIZEX = GRP_SIZEX = 4,
+       then the tile is 8x8 including border,
+       then in case idx = 0, dx coef by pixel are:
+      |   | 0         | 1 | 2         | 3 | 4 | 5 | 6 | 7 |
+      |---+-----------+---+-----------+---+---+---+---+---|
+      | 0 | idx:   -1 |   | idx+2:  1 |   |   |   |   |   |
+      | 1 | idx+8: -2 |   | idx+10: 2 |   |   |   |   |   |
+      | 2 | idx+16:-1 |   | idx+18: 1 |   |   |   |   |   |
+      ...
+      in general case: (GRP_SIZEX + 4) means (y + 1)
+     */
     floatN dx = fma((floatN)2, smem[idx + GRP_SIZEX + 6] - smem[idx + GRP_SIZEX + 4],
         smem[idx + 2] - smem[idx] + smem[idx + 2 * GRP_SIZEX + 10] - smem[idx + 2 * GRP_SIZEX + 8]);
+
+    /* if GRP_SIZEX = GRP_SIZEX = 4,
+       then the tile is 8x8 including border,
+       then in case idx = 0, dy coef by pixel are:
+      |   | 0         | 1         | 3         | 4 | 5 | 6 | 7 |
+      |---+-----------+-----------+-----------+---+---+---+---|
+      | 0 | idx:1     | idx+1:2   | idx+2:1   |   |   |   |   |
+      | 1 |           |           |           |   |   |   |   |
+      | 2 | idx+16:-1 | idx+17:-2 | idx+18:-1 |   |   |   |   |
+      ...
+      in general case: (GRP_SIZEX + 4) means (y + 1)
+    */
 
     floatN dy = fma((floatN)2, smem[idx + 1] - smem[idx + 2 * GRP_SIZEX + 9],
         smem[idx + 2] - smem[idx + 2 * GRP_SIZEX + 10] + smem[idx] - smem[idx + 2 * GRP_SIZEX + 8]);
@@ -128,6 +151,35 @@ __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src
     int start_x = GRP_SIZEX * get_group_id(0);
     int start_y = GRP_SIZEY * get_group_id(1);
 
+    /* this is the list of loadpix call done the loop below with in case of
+
+       Example with:
+
+         - the tile size:  GRP_SIZEY 4, GRP_SIZEX 4
+         - the image size: cols 10,     rows 10
+
+       => the tile size will be 8 x 8 (border size if 2 pixel in each direction)
+       => in case of local_size = 4x4 (=16), each work item have to load 4 pixels:
+
+       lidx:0, lidy:0 =>smem[0]  = loadpix(0)   smem[16] = loadpix(20)  smem[32] = loadpix(40)  smem[48] = loadpix(60)
+       lidx:1, lidy:0 =>smem[1]  = loadpix(1)   smem[17] = loadpix(21)  smem[33] = loadpix(41)  smem[49] = loadpix(61)
+       lidx:2, lidy:0 =>smem[2]  = loadpix(2)   smem[18] = loadpix(22)  smem[34] = loadpix(42)  smem[50] = loadpix(62)
+       lidx:3, lidy:0 =>smem[3]  = loadpix(3)   smem[19] = loadpix(23)  smem[35] = loadpix(43)  smem[51] = loadpix(63)
+       lidx:0, lidy:1 =>smem[4]  = loadpix(4)   smem[20] = loadpix(24)  smem[36] = loadpix(44)  smem[52] = loadpix(64)
+       lidx:1, lidy:1 =>smem[5]  = loadpix(5)   smem[21] = loadpix(25)  smem[37] = loadpix(45)  smem[53] = loadpix(65)
+       lidx:2, lidy:1 =>smem[6]  = loadpix(6)   smem[22] = loadpix(26)  smem[38] = loadpix(46)  smem[54] = loadpix(66)
+       lidx:3, lidy:1 =>smem[7]  = loadpix(7)   smem[23] = loadpix(27)  smem[39] = loadpix(47)  smem[55] = loadpix(67)
+       lidx:0, lidy:2 =>smem[8]  = loadpix(10)  smem[24] = loadpix(30)  smem[40] = loadpix(50)  smem[56] = loadpix(70)
+       lidx:1, lidy:2 =>smem[9]  = loadpix(11)  smem[25] = loadpix(31)  smem[41] = loadpix(51)  smem[57] = loadpix(71)
+       lidx:2, lidy:2 =>smem[10] = loadpix(12)  smem[26] = loadpix(32)  smem[42] = loadpix(52)  smem[58] = loadpix(72)
+       lidx:3, lidy:2 =>smem[11] = loadpix(13)  smem[27] = loadpix(33)  smem[43] = loadpix(53)  smem[59] = loadpix(73)
+       lidx:0, lidy:3 =>smem[12] = loadpix(14)  smem[28] = loadpix(34)  smem[44] = loadpix(54)  smem[60] = loadpix(74)
+       lidx:1, lidy:3 =>smem[13] = loadpix(15)  smem[29] = loadpix(35)  smem[45] = loadpix(55)  smem[61] = loadpix(75)
+       lidx:2, lidy:3 =>smem[14] = loadpix(16)  smem[30] = loadpix(36)  smem[46] = loadpix(56)  smem[62] = loadpix(76)
+       lidx:3, lidy:3 =>smem[15] = loadpix(17)  smem[31] = loadpix(37)  smem[47] = loadpix(57)  smem[63] = loadpix(77)
+
+    */
+
     int i = lidx + lidy * GRP_SIZEX;
     for (int j = i;  j < (GRP_SIZEX + 4) * (GRP_SIZEY + 4); j += GRP_SIZEX * GRP_SIZEY)
     {
@@ -143,6 +195,7 @@ __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src
 
     __local float mag[(GRP_SIZEX + 2) * (GRP_SIZEY + 2)];
 
+    // crop 1 pix of the border
     lidx++;
     lidy++;
 
