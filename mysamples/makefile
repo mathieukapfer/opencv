@@ -1,7 +1,8 @@
 PWD=$(shell pwd)
 OpenCV_DIR=$(PWD)/../build
 OpenCV_SRC=$(PWD)/..
-OpenCV_Extra_Data=$(PWD)/../../opencv_extra/testdata/cv
+#OpenCV_Extra_Data=$(PWD)/../../opencv_extra/testdata/cv
+OpenCV_Extra_Data="/work2/common/embedded/KAF/KAF_libraries/opencv/4.5.0/opencv_extra/testdata/cv"
 
 # helper
 # ----------
@@ -51,7 +52,7 @@ RUN_ENV=$(RUN_ENV_GPU)
 #IMAGE=$(OpenCV_SRC)/samples/data/graf3.png
 #IMAGE=$(OpenCV_Extra_Data)/shared/fruits.png
 #IMAGE=$(OpenCV_Extra_Data)/shared/baboon.png
-IMAGE=$(OpenCV_Extra_Data)/shared/1_itseez-0001438.png
+#IMAGE=$(OpenCV_Extra_Data)/shared/1_itseez-0001438.png
 #IMAGE=$(OpenCV_Extra_Data)/../gpu/stereobm/aloe-L.png
 
 

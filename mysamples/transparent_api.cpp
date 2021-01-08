@@ -13,7 +13,7 @@
 #include <ostream>
 using namespace cv;
 
-#define DEFAULT_IMAGE "../lena.jpg"
+#define DEFAULT_IMAGE "lena.jpg"
 #define USE_TRANSPARENT_API
 
 #define TIMESTAMP_START                                                 \
