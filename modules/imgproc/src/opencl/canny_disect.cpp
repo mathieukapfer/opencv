@@ -43,7 +43,7 @@ void loadpixloop(int lidx, int lidy, int start_x, int start_y) {
   }
 }
 
-void compute_mag(int lidx, int lidy, int start_x, int start_y)
+void compute_sobel(int lidx, int lidy, int start_x, int start_y)
 {
     int i = lidx + lidy * GRP_SIZEX;
 
@@ -69,8 +69,35 @@ void compute_mag(int lidx, int lidy, int start_x, int start_y)
     i = lidx + lidy * (GRP_SIZEX + 2);
 
     printf("mag[%2d] = sobel(%2d) ", i, idx);
+}
+
+ int prev[4][2] = {
+    { 0, -1 },
+    { -1, 1 },
+    { -1, 0 },
+    { -1, -1 }
+};
+
+ int next[4][2] = {
+    { 0, 1 },
+    { 1, -1 },
+    { 1, 0 },
+    { 1, 1 }
+};
+
+
+void compute_mag(int lidx, int lidy) {
+  //float prev_mag = mag[(lidy + prev[dir][0]) * (GRP_SIZEX + 2) + lidx + prev[dir][1]];
+  //float next_mag = mag[(lidy + next[dir][0]) * (GRP_SIZEX + 2) + lidx + next[dir][1]] + (dir & 1);
+
+  for (int dir=0; dir < 4; dir++) {
+    printf("\ndir=%d ",dir);
+    printf("prev_mag = mag[%d], ", (lidy + prev[dir][0]) * (GRP_SIZEX + 2) + lidx + prev[dir][1] );
+    printf("next_mag = mag[%d]", (lidy + next[dir][0]) * (GRP_SIZEX + 2) + lidx + next[dir][1] );
+  }
 
 }
+
 int main(int argc, char *argv[]) {
 
   for (int y=0; y<GRP_SIZEY;y++)
@@ -78,7 +105,8 @@ int main(int argc, char *argv[]) {
       {
         printf("\nlidx:%2d, lidy:%2d =>", x,y);
         //loadpixloop(x,y,2,2);
-        compute_mag(x,y, 2, 2);
+        //compute_sobel(x,y,2,2);
+        compute_mag(x,y);
       }
 
   return 0;

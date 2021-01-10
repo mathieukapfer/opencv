@@ -151,15 +151,13 @@ __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src
     int start_x = GRP_SIZEX * get_group_id(0);
     int start_y = GRP_SIZEY * get_group_id(1);
 
-    /* this is the list of loadpix call done the loop below with in case of
+    /* this is the list of loadpix call done the loop below, in case of
 
-       Example with:
+         in case of local size =(4,4), that means  GRP_SIZEX=4, GRP_SIZEY=4
+         let'stake a small image: cols 10, rows 10
 
-         - the tile size:  GRP_SIZEY 4, GRP_SIZEX 4
-         - the image size: cols 10,     rows 10
-
-       => the tile size will be 8 x 8 (border size if 2 pixel in each direction)
-       => in case of local_size = 4x4 (=16), each work item have to load 4 pixels:
+       => the tile size is 8 x 8 (border size if 2 pixels in each direction)
+       => each work item have to load 4 pixels:
 
        lidx:0, lidy:0 =>smem[0]  = loadpix(0)   smem[16] = loadpix(20)  smem[32] = loadpix(40)  smem[48] = loadpix(60)
        lidx:1, lidy:0 =>smem[1]  = loadpix(1)   smem[17] = loadpix(21)  smem[33] = loadpix(41)  smem[49] = loadpix(61)
@@ -177,6 +175,15 @@ __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src
        lidx:1, lidy:3 =>smem[13] = loadpix(15)  smem[29] = loadpix(35)  smem[45] = loadpix(55)  smem[61] = loadpix(75)
        lidx:2, lidy:3 =>smem[14] = loadpix(16)  smem[30] = loadpix(36)  smem[46] = loadpix(56)  smem[62] = loadpix(76)
        lidx:3, lidy:3 =>smem[15] = loadpix(17)  smem[31] = loadpix(37)  smem[47] = loadpix(57)  smem[63] = loadpix(77)
+
+            <---------------------- image size (10x10)------------------------------->
+            <---------------------- till (8x8) -------------------------->
+            smem:loadpix =>
+       |   |     0 |    1 |     2 |     3 |     4 |     5 |     6 |     7 | 8   | 9   |
+       |---+-------+------+-------+-------+-------+-------+-------+-------+-----+-----|
+       | 0 |   0:0 |  1:1 |   2:2 |   3:3 |   4:4 |   5:5 |   6:6 |   7:7 | :8  | :9  |
+       | 1 |  8:10 | 9:11 | 10:12 | 11:13 | 12:14 | 13:15 | 14:16 | 15:17 | :18 | :19 |
+       | 2 | 16:20 |  ... |       |       |       |       |       |       |     |     |
 
     */
 
@@ -198,6 +205,44 @@ __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src
     // crop 1 pix of the border
     lidx++;
     lidy++;
+
+    /*
+       in case of local size =(4,4), that means  GRP_SIZEX=4, GRP_SIZEY=4
+
+       => the tile size is 8 x 8  (border size if 2 pixels in each direction)
+       => the sobel size is 6 x 6 (border size if 1 pixels in each direction)
+
+       lidx: 0, lidy: 0 =>mag[ 0] = sobel( 0)  mag[30] = sobel(40)!  mag[ 0] = sobel( 0)!  mag[ 5] = sobel( 5)!  mag[ 7] = sobel( 9)
+       lidx: 1, lidy: 0 =>mag[ 1] = sobel( 1)  mag[31] = sobel(41)   mag[ 6] = sobel( 8)   mag[11] = sobel(13)   mag[ 8] = sobel(10)
+       lidx: 2, lidy: 0 =>mag[ 2] = sobel( 2)  mag[32] = sobel(42)   mag[12] = sobel(16)   mag[17] = sobel(21)   mag[ 9] = sobel(11)
+       lidx: 3, lidy: 0 =>mag[ 3] = sobel( 3)  mag[33] = sobel(43)   mag[18] = sobel(24)   mag[23] = sobel(29)   mag[10] = sobel(12)
+       lidx: 0, lidy: 1 =>mag[ 4] = sobel( 4)  mag[34] = sobel(44)   mag[24] = sobel(32)   mag[29] = sobel(37)   mag[13] = sobel(17)
+       lidx: 1, lidy: 1 =>mag[ 5] = sobel( 5)  mag[35] = sobel(45)!  mag[30] = sobel(40)!  mag[35] = sobel(45)!  mag[14] = sobel(18)
+       lidx: 2, lidy: 1 =>mag[15] = sobel(19)
+       lidx: 3, lidy: 1 =>mag[16] = sobel(20)
+       lidx: 0, lidy: 2 =>mag[19] = sobel(25)
+       lidx: 1, lidy: 2 =>mag[20] = sobel(26)
+       lidx: 2, lidy: 2 =>mag[21] = sobel(27)
+       lidx: 3, lidy: 2 =>mag[22] = sobel(28)
+       lidx: 0, lidy: 3 =>mag[25] = sobel(33)
+       lidx: 1, lidy: 3 =>mag[26] = sobel(34)
+       lidx: 2, lidy: 3 =>mag[27] = sobel(35)
+       lidx: 3, lidy: 3 =>mag[28] = sobel(36)
+
+            <---------------- till (8x8) ------------------------->
+            <----------- sobel (6x6) ------------------>
+            mag:sobel
+       |   |    0  |   1 |    2 |    3 |     4 |     5 | 6   | 7   |
+       |---+-------+-----+------+------+-------+-------+-----+-----|
+       | 0 |  0:0  | 1:1 |  2:2 |  3:3 |   4:4 |   5:5 | :6  | :7  |
+       | 1 |  6:8  | 7:9 | 8:10 | 9:11 | 10:12 | 11:13 | :14 | :15 |
+       | 2 | 12:16 | ... |      |      |       |       |     |     |
+
+       NOTES:
+          - some sobel is compute twice ! (notice '!' in section above)
+          - the wi work load is not the same
+
+    */
 
     if (i < GRP_SIZEX + 2)
     {
@@ -286,6 +331,26 @@ __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src
 
         int dir3 = (a * b) & (((x ^ y) & 0x80000000) >> 31); // if a = 1, b = 1, dy ^ dx < 0
         int dir = a * b + 2 * dir3;
+
+        /*
+          in case of local size =(4,4), that means  GRP_SIZEX=4, GRP_SIZEY=4
+          mag[x] contains sobel value
+
+               <----------- sobel (6x6) ---------------->
+                         <--- final value (4x4)----->
+          |   | 0       | 1       | 2       | 3 | 4 | 5 |
+          |---+---------+---------+---------+---+---+---|
+          | 0 | mag(-7) | mag(-6) | mag(-5) |   |   |   |
+          | 1 | mag(-1) | mag(0)  | mag(+1) |   |   |   |
+          | 2 | mag(+5) | mag(+6) | mag(+7) |   |   |   |
+
+          if lidx: 0, lidy: 0,
+            and dir=0 then prev_mag = mag[-1], next_mag = mag[1]
+            and dir=1 then prev_mag = mag[-5], next_mag = mag[5]
+            and dir=2 then prev_mag = mag[-6], next_mag = mag[6]
+            and dir=3 then prev_mag = mag[-7], next_mag = mag[7]
+
+        */
         float prev_mag = mag[(lidy + prev[dir][0]) * (GRP_SIZEX + 2) + lidx + prev[dir][1]];
         float next_mag = mag[(lidy + next[dir][0]) * (GRP_SIZEX + 2) + lidx + next[dir][1]] + (dir & 1);
 
