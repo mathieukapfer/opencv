@@ -1,18 +1,20 @@
 #include <stdio.h>
 
-#define MAX(a, b) a > b ? a : b
-#define MIN(a, b) a < b ? a : b
-#define min(a, b) a < b ? a : b
-#define clamp(val, min, max) MAX(MIN(val,max),min)
+#define MAX(a, b) ((a) > (b)) ? (a) : (b)
+#define MIN(a, b) ((a) < (b)) ? (a) : (b)
+#define min(a, b) MIN(a,b)
+#define clamp(val, min, max) (MAX(MIN(val,max),min))
 
 #define GRP_SIZEY 4
 #define GRP_SIZEX 4
 
-#define cols 10
-#define rows 10
+#define cols 640
+#define rows 480
 
 int src[cols * rows];
 int smem[(GRP_SIZEX + 4) * (GRP_SIZEY + 4)];
+
+#define get_group_id(x) 0
 
 #define src_offset 0
 #define src_step cols
@@ -98,15 +100,18 @@ void compute_mag(int lidx, int lidy) {
 
 }
 
-int main(int argc, char *argv[]) {
+int main() {
+
+  int start_x = GRP_SIZEX * get_group_id(0);
+  int start_y = GRP_SIZEY * get_group_id(1);
 
   for (int y=0; y<GRP_SIZEY;y++)
     for (int x=0; x<GRP_SIZEX; x++)
       {
         printf("\nlidx:%2d, lidy:%2d =>", x,y);
-        //loadpixloop(x,y,2,2);
-        //compute_sobel(x,y,2,2);
-        compute_mag(x,y);
+        loadpixloop(x,y,start_x, start_y);
+        //compute_sobel(x,y,start_x, start_y);
+        //compute_mag(x,y);
       }
 
   return 0;
