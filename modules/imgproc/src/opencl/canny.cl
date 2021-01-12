@@ -153,37 +153,44 @@ __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src
 
     /* this is the list of loadpix call done the loop below, in case of
 
-         in case of local size =(4,4), that means  GRP_SIZEX=4, GRP_SIZEY=4
-         let'stake a small image: cols 10, rows 10
+         in case of
+            - local size =(4,4), that means  GRP_SIZEX=4, GRP_SIZEY=4
+            - image size: cols 480, rows 512
+            - global_id : (0,0)
 
        => the tile size is 8 x 8 (border size if 2 pixels in each direction)
        => each work item have to load 4 pixels:
 
-       lidx:0, lidy:0 =>smem[0]  = loadpix(0)   smem[16] = loadpix(20)  smem[32] = loadpix(40)  smem[48] = loadpix(60)
-       lidx:1, lidy:0 =>smem[1]  = loadpix(1)   smem[17] = loadpix(21)  smem[33] = loadpix(41)  smem[49] = loadpix(61)
-       lidx:2, lidy:0 =>smem[2]  = loadpix(2)   smem[18] = loadpix(22)  smem[34] = loadpix(42)  smem[50] = loadpix(62)
-       lidx:3, lidy:0 =>smem[3]  = loadpix(3)   smem[19] = loadpix(23)  smem[35] = loadpix(43)  smem[51] = loadpix(63)
-       lidx:0, lidy:1 =>smem[4]  = loadpix(4)   smem[20] = loadpix(24)  smem[36] = loadpix(44)  smem[52] = loadpix(64)
-       lidx:1, lidy:1 =>smem[5]  = loadpix(5)   smem[21] = loadpix(25)  smem[37] = loadpix(45)  smem[53] = loadpix(65)
-       lidx:2, lidy:1 =>smem[6]  = loadpix(6)   smem[22] = loadpix(26)  smem[38] = loadpix(46)  smem[54] = loadpix(66)
-       lidx:3, lidy:1 =>smem[7]  = loadpix(7)   smem[23] = loadpix(27)  smem[39] = loadpix(47)  smem[55] = loadpix(67)
-       lidx:0, lidy:2 =>smem[8]  = loadpix(10)  smem[24] = loadpix(30)  smem[40] = loadpix(50)  smem[56] = loadpix(70)
-       lidx:1, lidy:2 =>smem[9]  = loadpix(11)  smem[25] = loadpix(31)  smem[41] = loadpix(51)  smem[57] = loadpix(71)
-       lidx:2, lidy:2 =>smem[10] = loadpix(12)  smem[26] = loadpix(32)  smem[42] = loadpix(52)  smem[58] = loadpix(72)
-       lidx:3, lidy:2 =>smem[11] = loadpix(13)  smem[27] = loadpix(33)  smem[43] = loadpix(53)  smem[59] = loadpix(73)
-       lidx:0, lidy:3 =>smem[12] = loadpix(14)  smem[28] = loadpix(34)  smem[44] = loadpix(54)  smem[60] = loadpix(74)
-       lidx:1, lidy:3 =>smem[13] = loadpix(15)  smem[29] = loadpix(35)  smem[45] = loadpix(55)  smem[61] = loadpix(75)
-       lidx:2, lidy:3 =>smem[14] = loadpix(16)  smem[30] = loadpix(36)  smem[46] = loadpix(56)  smem[62] = loadpix(76)
-       lidx:3, lidy:3 =>smem[15] = loadpix(17)  smem[31] = loadpix(37)  smem[47] = loadpix(57)  smem[63] = loadpix(77)
+         lidx: 0, lidy: 0 =>smem[0] = loadpix(0)  smem[16] = loadpix(0)  smem[32] = loadpix(1280)  smem[48] = loadpix(2560)
+         lidx: 1, lidy: 0 =>smem[1] = loadpix(0)  smem[17] = loadpix(0)  smem[33] = loadpix(1280)  smem[49] = loadpix(2560)
+         lidx: 2, lidy: 0 =>smem[2] = loadpix(0)  smem[18] = loadpix(0)  smem[34] = loadpix(1280)  smem[50] = loadpix(2560)
+         lidx: 3, lidy: 0 =>smem[3] = loadpix(1)  smem[19] = loadpix(1)  smem[35] = loadpix(1281)  smem[51] = loadpix(2561)
+         lidx: 0, lidy: 1 =>smem[4] = loadpix(2)  smem[20] = loadpix(2)  smem[36] = loadpix(1282)  smem[52] = loadpix(2562)
+         lidx: 1, lidy: 1 =>smem[5] = loadpix(3)  smem[21] = loadpix(3)  smem[37] = loadpix(1283)  smem[53] = loadpix(2563)
+         lidx: 2, lidy: 1 =>smem[6] = loadpix(4)  smem[22] = loadpix(4)  smem[38] = loadpix(1284)  smem[54] = loadpix(2564)
+         lidx: 3, lidy: 1 =>smem[7] = loadpix(5)  smem[23] = loadpix(5)  smem[39] = loadpix(1285)  smem[55] = loadpix(2565)
+         lidx: 0, lidy: 2 =>smem[8] = loadpix(0)  smem[24] = loadpix(640)  smem[40] = loadpix(1920)  smem[56] = loadpix(3200)
+         lidx: 1, lidy: 2 =>smem[9] = loadpix(0)  smem[25] = loadpix(640)  smem[41] = loadpix(1920)  smem[57] = loadpix(3200)
+         lidx: 2, lidy: 2 =>smem[10] = loadpix(0)  smem[26] = loadpix(640)  smem[42] = loadpix(1920)  smem[58] = loadpix(3200)
+         lidx: 3, lidy: 2 =>smem[11] = loadpix(1)  smem[27] = loadpix(641)  smem[43] = loadpix(1921)  smem[59] = loadpix(3201)
+         lidx: 0, lidy: 3 =>smem[12] = loadpix(2)  smem[28] = loadpix(642)  smem[44] = loadpix(1922)  smem[60] = loadpix(3202)
+         lidx: 1, lidy: 3 =>smem[13] = loadpix(3)  smem[29] = loadpix(643)  smem[45] = loadpix(1923)  smem[61] = loadpix(3203)
+         lidx: 2, lidy: 3 =>smem[14] = loadpix(4)  smem[30] = loadpix(644)  smem[46] = loadpix(1924)  smem[62] = loadpix(3204)
+         lidx: 3, lidy: 3 =>smem[15] = loadpix(5)  smem[31] = loadpix(645)  smem[47] = loadpix(1925)  smem[63] = loadpix(3205)
 
-            <---------------------- image size (10x10)------------------------------->
-            <---------------------- till (8x8) -------------------------->
-            smem:loadpix =>
-       |   |     0 |    1 |     2 |     3 |     4 |     5 |     6 |     7 | 8   | 9   |
-       |---+-------+------+-------+-------+-------+-------+-------+-------+-----+-----|
-       | 0 |   0:0 |  1:1 |   2:2 |   3:3 |   4:4 |   5:5 |   6:6 |   7:7 | :8  | :9  |
-       | 1 |  8:10 | 9:11 | 10:12 | 11:13 | 12:14 | 13:15 | 14:16 | 15:17 | :18 | :19 |
-       | 2 | 16:20 |  ... |       |       |       |       |       |       |     |     |
+
+       <---------------------- image size (640x480)------------------------------>
+       <---------------------- till (8x8) -------------------------->
+       |    |    0 |    1 |    2 |    3 |    4 |    5 |    6 |    7 |
+       |----+------+------+------+------+------+------+------+------|
+       |  0 |    0 |    0 |    0 |    1 |    2 |    3 |    4 |    5 |
+       |  8 |    0 |    0 |    0 |    1 |    2 |    3 |    4 |    5 |
+       | 16 |    0 |    0 |    0 |    1 |    2 |    3 |    4 |    5 |
+       | 24 |    0 |  640 |  640 |  641 |  642 |  643 |  644 |  645 |
+       | 32 | 1280 | 1208 | 1280 | 1281 | 1282 | 1283 | 1284 | 1285 |
+       | 40 | 1920 | 1920 | 1920 | 1921 | 1922 | 1923 | 1924 | 1925 |
+       | 48 | 2560 | 2560 | 2560 | 2561 | 2562 | 2563 | 2564 | 2565 |
+       | 56 | 3200 | 2320 | 3200 | 3201 | 3202 | 3203 | 3204 | 3205 |
 
     */
 
