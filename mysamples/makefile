@@ -37,6 +37,8 @@ compile:
 #POCL_DEBUG=0
 POCL_DEBUG=timing
 
+OCLGRING=oclgrind
+
 RUN_ENV_MPPA= \
 	OPENCV_OPENCL_DEVICE=':ACCELERATOR:' \
 	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16 \
@@ -67,6 +69,7 @@ transparent_api: opencv_imgproc build/$@
 %: build/%
 	cd build && make $*
 	$(RUN_ENV) \
+	$(OCLGRING) \
 	./build/$*
 
 ## dependencies

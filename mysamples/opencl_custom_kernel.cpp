@@ -15,7 +15,18 @@
 using namespace std;
 using namespace cv;
 
+#ifdef ENABLE_PRINTF_FLAGS
+#define OCL_COMPILE_FLAGS "-DENABLE_PRINTF"
+#else
+#define OCL_COMPILE_FLAGS ""
+#endif
+
 static const char* opencl_kernel_src =
+  "#ifdef ENABLE_PRINTF\n"
+  "#define PRINTF(FMT, ...) printf(FMT, ##__VA_ARGS__)\n"
+  "#else\n"
+  "#define PRINTF(FMT, ...)\n"
+  "#endif\n"
 "__kernel void magnutude_filter_8u(\n"
 "       __global const uchar* src, int src_step, int src_offset,\n"
 "       __global uchar* dst, int dst_step, int dst_offset, int dst_rows, int dst_cols,\n"
@@ -27,7 +38,7 @@ static const char* opencl_kernel_src =
 "   {\n"
 "       int dst_idx = y * dst_step + x + dst_offset;\n"
 "       if (x > 0 && x < dst_cols - 1 && y > 0 && y < dst_rows - 2)\n"
-"       {\n"
+"       { if ((x<10) && (y<10) ) PRINTF(\"%d,%d \",x,y);\n"
 "           int src_idx = y * src_step + x + src_offset;\n"
 "           int dx = (int)src[src_idx]*2 - src[src_idx - 1]          - src[src_idx + 1];\n"
 "           int dy = (int)src[src_idx]*2 - src[src_idx - 1*src_step] - src[src_idx + 1*src_step];\n"
@@ -111,7 +122,7 @@ int main(int argc, char** argv)
 
         //! [Compile/build OpenCL for current OpenCL device]
         cv::String errmsg;
-        cv::ocl::Program program(source, "", errmsg);
+        cv::ocl::Program program(source, OCL_COMPILE_FLAGS, errmsg);
         if (program.ptr() == NULL)
         {
             cerr << "Can't compile OpenCL program:" << endl << errmsg << endl;
