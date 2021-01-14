@@ -7,12 +7,14 @@
 ;;; Code:
 
 ;; Const
-(setq num-regexp "[0-9]+")
+(setq num-regexp "[0-9.]+")
 (setq name-regexp "[A-Za-z0-9_.]+")
 (setq name-with-point-regexp "[A-Za-z0-9_.]+")
+(setq sep "[ \t]+")
 
 (setq test-name-regexp (concat "RUN.*" "\\(" "OCL" name-with-point-regexp "/" num-regexp "\\)") )
 (setq kernel-name-regexp (concat "clEnqueueNDRangeKernel('" "\\("  name-regexp "\\)" "'" ))
+(setq kernel-timing-regexp (concat "TIMING |" sep ">>>" sep "\\(" num-regexp "\\)" sep "ms" ))
 
 
 (defun my-format-perf-report()
@@ -26,14 +28,20 @@
     (let ((data (match-data)))
       (cond
        ((looking-at test-name-regexp)
+        ;; parse test properties
         (setq test-name (match-string 1))
+        (search-forward-regexp "GetParam() = (\\([a-zA-Z0-9. ,]+\\)")
+        (setq test-param (match-string 1))
         (search-forward-regexp "mean=\\([0-9.]+\\)")
         (setq test-mean (match-string 1))
-        (princ (format "\n%s: %s\n" test-name test-mean) output)
+        (princ (format "\n%s\t(%s)\t%s\tms" test-name test-param test-mean) output)
         )
        ((looking-at kernel-name-regexp)
+        ;; parse kernel properties
         (setq kernel-name (match-string 1))
-        (princ (format " %s " kernel-name) output)
+        (search-forward-regexp kernel-timing-regexp nil t)
+        (setq kernel-timing (match-string 1))
+        (princ (format "\t%s:\t%s\tms" kernel-name kernel-timing) output)
         )
        )
       (set-match-data data)
