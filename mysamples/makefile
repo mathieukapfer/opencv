@@ -63,6 +63,7 @@ RUN_ENV=$(RUN_ENV_MPPA)
 transparent_api: opencv_imgproc build/$@
 	cd build && make $*
 	$(RUN_ENV) \
+	$(OCLGRING) \
 	./build/$@ $(IMAGE)
 
 ## generic target

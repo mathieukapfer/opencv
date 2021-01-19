@@ -15,6 +15,7 @@ using namespace cv;
 
 #define DEFAULT_IMAGE "lena.jpg"
 #define USE_TRANSPARENT_API
+#define SHOW_IMAGE true
 
 #define TIMESTAMP_START                                                 \
   static int64 tick_ref = (int64)cv::getTickCount();                    \
@@ -59,11 +60,15 @@ int main(int argc, char *argv[]) {
   std::cout << "image size ori:" << img.size() << std::endl;
 
   TIMESTAMP;
-  imshow("ori", img);
+  if(SHOW_IMAGE) {
+    imshow("ori", img);
+  }
 
   std::cout << "cvtColor" << std::endl;
   cvtColor(img, gray, COLOR_BGR2GRAY);
-  imshow("gray", gray);
+  if(SHOW_IMAGE) {
+    imshow("gray", gray);
+  }
   TIMESTAMP;
 
   std::cout << "GaussianBlur" << std::endl;
@@ -74,8 +79,10 @@ int main(int argc, char *argv[]) {
   std::cout << "Canny" << std::endl;
   Canny(gray2, gray3, 0, 50); TIMESTAMP;
 
-  imshow("edges", gray3);
-  waitKey();
+  if(SHOW_IMAGE) {
+    imshow("edges", gray3);
+    waitKey();
+  }
 
   return 0;
 }
