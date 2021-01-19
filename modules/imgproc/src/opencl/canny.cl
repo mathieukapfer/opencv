@@ -46,6 +46,17 @@
 #define TG22 0.4142135623730950488016887242097f
 #define TG67 2.4142135623730950488016887242097f
 
+//#define ENABLE_PRINTF
+
+#ifdef ENABLE_PRINTF
+#define PRINTF(FMT, ...) \
+  if ( ( get_group_id(0) == 0 ) &&  get_group_id(1) == 0)
+  printf("\nlidx:%2d, lidy:%2d =>" FMT, x, y, ##__VA_ARGS__)
+#else
+#define PRINTF(FMT, ...)
+#endif
+
+
 #ifdef WITH_SOBEL
 
 #if cn == 1
@@ -200,6 +211,7 @@ __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src
         int x = clamp(start_x - 2 + (j % (GRP_SIZEX + 4)), 0, cols - 1);
         int y = clamp(start_y - 2 + (j / (GRP_SIZEX + 4)), 0, rows - 1);
         smem[j] = loadpix(src + mad24(y, src_step, mad24(x, cn * (int)sizeof(TYPE), src_offset)));
+        PRINTF("smem[%d] = loadpix(%d)  ",j, mad24(y, src_step, mad24(x, cn * (int)sizeof(TYPE), src_offset)));
     }
 
     barrier(CLK_LOCAL_MEM_FENCE);
@@ -223,7 +235,7 @@ __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src
        lidx: 1, lidy: 0 =>mag[ 1] = sobel( 1)  mag[31] = sobel(41)   mag[ 6] = sobel( 8)   mag[11] = sobel(13)   mag[ 8] = sobel(10)
        lidx: 2, lidy: 0 =>mag[ 2] = sobel( 2)  mag[32] = sobel(42)   mag[12] = sobel(16)   mag[17] = sobel(21)   mag[ 9] = sobel(11)
        lidx: 3, lidy: 0 =>mag[ 3] = sobel( 3)  mag[33] = sobel(43)   mag[18] = sobel(24)   mag[23] = sobel(29)   mag[10] = sobel(12)
-       lidx: 0, lidy: 1 =>mag[ 4] = sobel( 4)  mag[34] = sobel(44)   mag[24] = sobel(32)   mag[29] = sobel(37)   mag[13] = sobel(17)
+       lidx: 0, lidy: 1 =>mag[ 4] = sobel( 4)  mag[34] = sobel(44)   mag[24] = sobel(32)   mag[29] = sobel(37)   mag[13] = sobel(17)1
        lidx: 1, lidy: 1 =>mag[ 5] = sobel( 5)  mag[35] = sobel(45)!  mag[30] = sobel(40)!  mag[35] = sobel(45)!  mag[14] = sobel(18)
        lidx: 2, lidy: 1 =>mag[15] = sobel(19)
        lidx: 3, lidy: 1 =>mag[16] = sobel(20)
@@ -256,12 +268,16 @@ __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src
         int grp_sizey = min(GRP_SIZEY + 1, rows - start_y);
         mag[i] = (sobel(i, smem)).z;
         mag[i + grp_sizey * (GRP_SIZEX + 2)] = (sobel(i + grp_sizey * (GRP_SIZEX + 4), smem)).z;
+        PRINTF("mag[%2d] = sobel(%2d)  ", i, i);
+        PRINTF("mag[%2d] = sobel(%2d)  ", i + grp_sizey * (GRP_SIZEX + 2), i + grp_sizey * (GRP_SIZEX + 4));
     }
     if (i < GRP_SIZEY + 2)
     {
         int grp_sizex = min(GRP_SIZEX + 1, cols - start_x);
         mag[i * (GRP_SIZEX + 2)] = (sobel(i * (GRP_SIZEX + 4), smem)).z;
         mag[i * (GRP_SIZEX + 2) + grp_sizex] = (sobel(i * (GRP_SIZEX + 4) + grp_sizex, smem)).z;
+        PRINTF("mag[%2d] = sobel(%2d)  ", i * (GRP_SIZEX + 2), i * (GRP_SIZEX + 4));
+        PRINTF("mag[%2d] = sobel(%2d)  ", i * (GRP_SIZEX + 2) + grp_sizex, i * (GRP_SIZEX + 4) + grp_sizex);
     }
 
     int idx = lidx + lidy * (GRP_SIZEX + 4);
@@ -269,6 +285,8 @@ __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src
 
     float3 res = sobel(idx, smem);
     mag[i] = res.z;
+    PRINTF("mag[%2d] = sobel(%2d) ", i, idx);
+
     barrier(CLK_LOCAL_MEM_FENCE);
 
     int x = (int) res.x;
