@@ -274,7 +274,7 @@ static bool ocl_Canny_kalray(InputArray _src, const UMat& dx_, const UMat& dy_, 
                         ocl::KernelArg::WriteOnlyNoSize(map),
                         (float) low, (float) high);
 
-        if (!with_sobel.run(2, globalsize, localsize, false))
+        if (!with_sobel.runProfiling(2, globalsize, localsize))
             return false;
     }
     else

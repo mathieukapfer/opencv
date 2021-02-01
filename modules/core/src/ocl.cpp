@@ -3765,6 +3765,32 @@ bool Kernel::Impl::run(int dims, size_t globalsize[], size_t localsize[],
                 CV_OCL_CHECK(clGetEventProfilingInfo(asyncEvent, CL_PROFILING_COMMAND_START, sizeof(startTime), &startTime, NULL));
                 CV_OCL_CHECK(clGetEventProfilingInfo(asyncEvent, CL_PROFILING_COMMAND_END, sizeof(stopTime), &stopTime, NULL));
                 *timeNS = (int64)(stopTime - startTime);
+
+                { // display time in human readable format instead of ns
+                  int time_interger_part = 0;
+                  int time_floating_part = 0;
+                  const char *time_unit = "NA";
+                  const int coed_ms= 1000000;
+                  const int coed_us= 1000;
+
+                  if (*timeNS > coed_ms ) {
+                    time_interger_part = *timeNS / coed_ms;
+                    time_floating_part = *timeNS % coed_ms;
+                    time_unit="ms";
+                  } else if (*timeNS > coed_us ) {
+                    time_interger_part = *timeNS / coed_ms;
+                    time_floating_part = *timeNS % coed_ms;
+                    time_unit="us";
+                    } else {
+                    time_interger_part = *timeNS;
+                    time_floating_part = 0;
+                    time_unit="ns";
+                  }
+
+                  std::cout << "POCL PROFILING: " << time_interger_part << "." << time_floating_part << " " << time_unit << std::endl;
+                }
+
+
             }
             else
             {
