@@ -3778,8 +3778,8 @@ bool Kernel::Impl::run(int dims, size_t globalsize[], size_t localsize[],
                     time_floating_part = *timeNS % coed_ms;
                     time_unit="ms";
                   } else if (*timeNS > coed_us ) {
-                    time_interger_part = *timeNS / coed_ms;
-                    time_floating_part = *timeNS % coed_ms;
+                    time_interger_part = *timeNS / coed_us;
+                    time_floating_part = *timeNS % coed_us;
                     time_unit="us";
                     } else {
                     time_interger_part = *timeNS;
@@ -3787,7 +3787,7 @@ bool Kernel::Impl::run(int dims, size_t globalsize[], size_t localsize[],
                     time_unit="ns";
                   }
 
-                  std::cout << "POCL PROFILING: " << time_interger_part << "." << time_floating_part << " " << time_unit << std::endl;
+                  std::cout << "OPENCL PROFILING: " << time_interger_part << "." << time_floating_part << " " << time_unit << std::endl;
                 }
 
 

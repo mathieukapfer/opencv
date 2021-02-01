@@ -274,7 +274,11 @@ static bool ocl_Canny_kalray(InputArray _src, const UMat& dx_, const UMat& dy_, 
                         ocl::KernelArg::WriteOnlyNoSize(map),
                         (float) low, (float) high);
 
+#ifdef FORCE_OPENCL_PROFILING
         if (!with_sobel.runProfiling(2, globalsize, localsize))
+#else
+        if (!with_sobel.run(2, globalsize, localsize, false))
+#endif
             return false;
     }
     else
@@ -340,7 +344,11 @@ static bool ocl_Canny_kalray(InputArray _src, const UMat& dx_, const UMat& dy_, 
             return false;
 
         edgesHysteresis.args(ocl::KernelArg::ReadWrite(map));
+#ifdef FORCE_OPENCL_PROFILING
+        if (!edgesHysteresis.runProfiling(2, step2globalsize, step2localsize))
+#else
         if (!edgesHysteresis.run(2, step2globalsize, step2localsize, false))
+#endif
             return false;
     }
 
@@ -357,7 +365,11 @@ static bool ocl_Canny_kalray(InputArray _src, const UMat& dx_, const UMat& dy_, 
 
     size_t step3localsize[2] = { (size_t)16, (size_t)1 };
     size_t step3globalsize[2] = { (size_t)80, (size_t)1 };
+#ifdef FORCE_OPENCL_PROFILING
+    return getEdgesKernel.runProfiling(2, step3globalsize, step3localsize);
+#else
     return getEdgesKernel.run(2, step3globalsize, step3localsize, false);
+#endif
 }
 
 template <bool useCustomDeriv>

@@ -14,8 +14,11 @@
 
 (setq test-name-regexp (concat "RUN.*" "\\(" "OCL" name-with-point-regexp "/" num-regexp "\\)") )
 (setq kernel-name-regexp (concat "clEnqueueNDRangeKernel('" "\\("  name-regexp "\\)" "'" ))
-(setq kernel-timing-regexp (concat "TIMING |" sep ">>>" sep "\\(" num-regexp "\\)" sep "\\(" ".s" "\\)" ))
-
+(setq kernel-timing-regexp (concat "\\(?:"
+                                   "TIMING |" sep ">>>" sep "\\|" ;; pocl timing
+                                   "OPENCL PROFILING:" sep          ;; opencl timing
+                                   "\\)"
+                                   "\\(" num-regexp "\\)" sep "\\(" ".s" "\\)" ))
 
 (defun my-format-perf-report(&optional file-to-parse)
   (interactive)
