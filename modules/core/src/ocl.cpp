@@ -3787,7 +3787,9 @@ bool Kernel::Impl::run(int dims, size_t globalsize[], size_t localsize[],
                     time_unit="ns";
                   }
 
-                  std::cout << "OPENCL PROFILING: " << time_interger_part << "." << time_floating_part << " " << time_unit << std::endl;
+                  std::cout << "OPENCL PROFILING: " << time_interger_part << "." << time_floating_part << " " << time_unit
+                            << " (" << *timeNS << " ns)"
+                            << std::endl;
                 }
 
 
