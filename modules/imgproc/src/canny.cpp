@@ -44,6 +44,7 @@
 #include "opencl_kernels_imgproc.hpp"
 #include "opencv2/core/hal/intrin.hpp"
 #include <deque>
+#include <iostream>
 
 #include "opencv2/core/openvx/ovx_defs.hpp"
 
@@ -142,13 +143,20 @@ static bool ocl_Canny(InputArray _src, const UMat& dx_, const UMat& dy_, OutputA
     const ocl::Device &dev = ocl::Device::getDefault();
     int max_wg_size = (int)dev.maxWorkGroupSize();
 
+    // OpenCL kernel source used
+    struct cv::ocl::internal::ProgramEntry used_canny_oclsrc = ocl::imgproc::canny_oclsrc;
+    if (dev.isKalray())
+    {
+        used_canny_oclsrc = ocl::imgproc::canny_kalray_oclsrc;
+    }
+
     int lSizeX = 32;
     int lSizeY = max_wg_size / 32;
 
     if (lSizeY == 0)
     {
-        lSizeX = 16;
-        lSizeY = max_wg_size / 16;
+        lSizeX = 4;
+        lSizeY = max_wg_size / 4;
     }
     if (lSizeY == 0)
     {
@@ -184,24 +192,78 @@ static bool ocl_Canny(InputArray _src, const UMat& dx_, const UMat& dy_, OutputA
                 Double thresholding
         */
         char cvt[40];
-        ocl::Kernel with_sobel("stage1_with_sobel", ocl::imgproc::canny_oclsrc,
-                               format("-D WITH_SOBEL -D cn=%d -D TYPE=%s -D convert_floatN=%s -D floatN=%s -D GRP_SIZEX=%d -D GRP_SIZEY=%d%s",
+
+        size_t globalsize[2] = { (size_t)size.width, (size_t)size.height },
+                localsize[2] = { (size_t)lSizeX, (size_t)lSizeY };
+
+        int grp_sizex = lSizeX;
+        int grp_sizey = lSizeY;
+
+        if (dev.isKalray())
+        {
+            // maximal __local mem size, with 8KB less for margin (alignment, metadata)
+            const size_t max_local_mem_size = dev.maxLocalMemSize() - 8*1024;
+
+            // let say we want to partition image into 8x8 = 64 blocks for 5 CUs
+            const int ideal_num_blocks_width  = size.width / 8;
+            const int ideal_num_blocks_height = size.height / 8;
+
+            // tune blocksize to make sure it fits in __local
+            auto stage1_with_sobel_local_footprint = [cn, &_src](int block_size_x, int block_size_y)
+            {
+                // This formula is developed in canny.cl, and is not the same
+                // for every kernels
+                return ((block_size_x + 4) * (block_size_y + 4) * 2 * _src.getMat().elemSize()) +
+                       ((block_size_x + 4) * (block_size_y + 4) * cn * sizeof(short)) +
+                       ((block_size_x + 2) * (block_size_y + 2) * 2 * sizeof(short)) +
+                       ((block_size_x + 2) * (block_size_y + 2) * 1 * sizeof(int)) +
+                       (block_size_x * block_size_y * 2 * sizeof(unsigned char));
+            };
+
+            // let's start with the ideal blocksize
+            int max_block_size = std::min(ideal_num_blocks_width, ideal_num_blocks_height);
+
+            // if blocksize too big, reduce it gradually
+            while (stage1_with_sobel_local_footprint(max_block_size, max_block_size) > max_local_mem_size)
+            {
+                max_block_size -= 16;
+            }
+
+            // now, the max_block_size should be as big as possible and fit in __local
+            grp_sizex = max_block_size;
+            grp_sizey = max_block_size;
+            if (grp_sizey > 64) {
+                grp_sizey /= 3;
+                grp_sizex *= 3;
+            }
+            grp_sizex = grp_sizex / 4 * 4;
+
+            // adjust localsize[] and globalsize[] to spawn less workgroup
+            // and more block-per-workgroup for the asynchronous streaming algo
+            // NOTE: 1D work dispatch
+            localsize[0] = max_wg_size;
+            localsize[1] = 1;
+            globalsize[0] = localsize[0] * dev.maxComputeUnits();
+            globalsize[1] = localsize[1];
+        }
+
+        ocl::Kernel with_sobel("stage1_with_sobel", used_canny_oclsrc,
+                               format("-D WITH_SOBEL -D cn=%d -D TYPE=%s -D convert_floatN=%s -D floatN=%s -D GRP_SIZEX=%d -D GRP_SIZEY=%d%s -D shortN=%s -D intN=%s",
                                       cn, ocl::memopTypeToStr(_src.depth()),
                                       ocl::convertTypeStr(_src.depth(), CV_32F, cn, cvt),
                                       ocl::typeToStr(CV_MAKE_TYPE(CV_32F, cn)),
-                                      lSizeX, lSizeY,
-                                      L2gradient ? " -D L2GRAD" : ""));
+                                      grp_sizex, grp_sizey,
+                                      L2gradient ? " -D L2GRAD" : "",
+                                      ocl::typeToStr(CV_MAKE_TYPE(CV_16S, cn)),
+                                      ocl::typeToStr(CV_MAKE_TYPE(CV_32S, cn))));
         if (with_sobel.empty())
             return false;
 
         UMat src = _src.getUMat();
-        map.create(size, CV_32S);
+        map.create(size, CV_8U);
         with_sobel.args(ocl::KernelArg::ReadOnly(src),
                         ocl::KernelArg::WriteOnlyNoSize(map),
                         (float) low, (float) high);
-
-        size_t globalsize[2] = { (size_t)size.width, (size_t)size.height },
-                localsize[2] = { (size_t)lSizeX, (size_t)lSizeY };
 
         if (!with_sobel.run(2, globalsize, localsize, false))
             return false;
@@ -232,7 +294,7 @@ static bool ocl_Canny(InputArray _src, const UMat& dx_, const UMat& dy_, OutputA
             dy = dy_;
         }
 
-        ocl::Kernel without_sobel("stage1_without_sobel", ocl::imgproc::canny_oclsrc,
+        ocl::Kernel without_sobel("stage1_without_sobel", used_canny_oclsrc,
                                     format("-D WITHOUT_SOBEL -D cn=%d -D GRP_SIZEX=%d -D GRP_SIZEY=%d%s",
                                            cn, lSizeX, lSizeY, L2gradient ? " -D L2GRAD" : ""));
         if (without_sobel.empty())
@@ -250,7 +312,7 @@ static bool ocl_Canny(InputArray _src, const UMat& dx_, const UMat& dy_, OutputA
             return false;
     }
 
-    int PIX_PER_WI = 8;
+    int PIX_PER_WI = 4;
     /*
         stage2:
             hysteresis (add weak edges if they are connected with strong edges)
@@ -260,22 +322,31 @@ static bool ocl_Canny(InputArray _src, const UMat& dx_, const UMat& dy_, OutputA
     if (sizey == 0)
         sizey = 1;
 
-    size_t globalsize[2] = { (size_t)size.width, ((size_t)size.height + PIX_PER_WI - 1) / PIX_PER_WI }, localsize[2] = { (size_t)lSizeX, (size_t)sizey };
+    size_t globalsize[2] = { (size_t)size.width, ((size_t)size.height + PIX_PER_WI - 1) / PIX_PER_WI };
 
-    ocl::Kernel edgesHysteresis("stage2_hysteresis", ocl::imgproc::canny_oclsrc,
-                                format("-D STAGE2 -D PIX_PER_WI=%d -D LOCAL_X=%d -D LOCAL_Y=%d",
-                                PIX_PER_WI, lSizeX, sizey));
+    {
+        size_t step2localsize[2] = { (size_t)4, (size_t)4 };
+        size_t step2globalsize[2] = { (size_t)4, (size_t)20 };
+        int pix_height = (size.height + step2globalsize[1] - 1) / step2globalsize[1];
+        int pix_width = (size.width + step2globalsize[0] - 1) / step2globalsize[0];
 
-    if (edgesHysteresis.empty())
-        return false;
+        ocl::Kernel edgesHysteresis("stage2_hysteresis", used_canny_oclsrc,
+                                    format("-D STAGE2 -D PIX_PER_WI=%d -D LOCAL_X=%d -D LOCAL_Y=%d"
+                                           " -D SIZE_X=%d -D SIZE_Y=%d -D NB_PE=%zu",
+                                    PIX_PER_WI, lSizeX, sizey,
+                                    pix_width, pix_height, step2localsize[0] * step2localsize[1]));
 
-    edgesHysteresis.args(ocl::KernelArg::ReadWrite(map));
-    if (!edgesHysteresis.run(2, globalsize, localsize, false))
-        return false;
+        if (edgesHysteresis.empty())
+            return false;
+
+        edgesHysteresis.args(ocl::KernelArg::ReadWrite(map));
+        if (!edgesHysteresis.run(2, step2globalsize, step2localsize, false))
+            return false;
+    }
 
     // get edges
 
-    ocl::Kernel getEdgesKernel("getEdges", ocl::imgproc::canny_oclsrc,
+    ocl::Kernel getEdgesKernel("getEdges", used_canny_oclsrc,
                                 format("-D GET_EDGES -D PIX_PER_WI=%d", PIX_PER_WI));
     if (getEdgesKernel.empty())
         return false;
@@ -285,7 +356,9 @@ static bool ocl_Canny(InputArray _src, const UMat& dx_, const UMat& dy_, OutputA
 
     getEdgesKernel.args(ocl::KernelArg::ReadOnly(map), ocl::KernelArg::WriteOnlyNoSize(dst));
 
-    return getEdgesKernel.run(2, globalsize, NULL, false);
+    size_t step3localsize[2] = { (size_t)16, (size_t)1 };
+    size_t step3globalsize[2] = { (size_t)80, (size_t)1 };
+    return getEdgesKernel.run(2, step3globalsize, step3localsize, false);
 }
 
 #endif
@@ -825,6 +898,11 @@ void Canny( InputArray _src, OutputArray _dst,
                 int aperture_size, bool L2gradient )
 {
     CV_INSTRUMENT_REGION();
+
+    std::cout << __FILE__ << ":" << __LINE__ << ":" << __FUNCTION__ << " called with "
+      "src size: " << _src.size() << "dst size: " << _dst.size() <<
+      ", low_thresh: " << low_thresh << ", high_thresh: " << high_thresh <<
+      ", aperture_size: " << aperture_size << ", L2gradient: " << L2gradient << std::endl;
 
     CV_Assert( _src.depth() == CV_8U );
 
