@@ -19,6 +19,8 @@
 #define CL_USE_DEPRECATED_OPENCL_2_0_APIS // eliminate build warning
 #define CL_TARGET_OPENCL_VERSION 200  // 2.0
 
+#define BUILD_LOG_LENGTH 16384
+
 #ifdef __APPLE__
 #define CL_SILENCE_DEPRECATION
 #include <OpenCL/cl.h>
@@ -29,6 +31,7 @@
 #include <opencv2/core/ocl.hpp>
 #include <opencv2/core/utility.hpp>
 #include <opencv2/video.hpp>
+#include <opencv2/videoio.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 
@@ -149,7 +152,7 @@ public:
         query_param(id, CL_DEVICE_IMAGE_MAX_ARRAY_SIZE, m_image_max_array_size);
 #endif
         query_param(id, CL_DEVICE_MAX_SAMPLERS, m_max_samplers);
-#if defined(CL_VERSION_1_2)
+#if defined(CL_VERSION_2_0)
         query_param(id, CL_DEVICE_IMAGE_PITCH_ALIGNMENT, m_image_pitch_alignment);
         query_param(id, CL_DEVICE_IMAGE_BASE_ADDRESS_ALIGNMENT, m_image_base_address_alignment);
 #endif
@@ -624,6 +627,10 @@ int App::initOpenCL()
         if (m_deviceInfo.image_support())
         {
             kernelSrc = kernelSrc                              +
+                "__constant sampler_t sampler_test = "         +
+                "        CLK_NORMALIZED_COORDS_FALSE | "       +
+                "        CLK_ADDRESS_CLAMP_TO_EDGE   | "       +
+                "        CLK_FILTER_NEAREST;"                  +
                 "__kernel "                                    +
                 "void bitwise_inv_img_8uC1("                   +
                 "    read_only  image2d_t srcImg,"             +
@@ -632,7 +639,7 @@ int App::initOpenCL()
                 "    int x = get_global_id(0);"                +
                 "    int y = get_global_id(1);"                +
                 "    int2 coord = (int2)(x, y);"               +
-                "    uint4 val = read_imageui(srcImg, coord);" +
+                "    uint4 val = read_imageui(srcImg, sampler_test, coord);" +
                 "    val.x = (~val.x) & 0x000000FF;"           +
                 "    write_imageui(dstImg, coord, val);"       +
                 "}";
@@ -645,8 +652,18 @@ int App::initOpenCL()
             return -1;
 
         res = clBuildProgram(m_program, 1, &m_device_id, 0, 0, 0);
-        if (CL_SUCCESS != res)
-            return -1;
+        if (CL_SUCCESS != res) {
+          // Determine the reason for the error
+          char *buildLog = new char[BUILD_LOG_LENGTH];
+          clGetProgramBuildInfo(m_program, m_device_id, CL_PROGRAM_BUILD_LOG,
+                                BUILD_LOG_LENGTH, buildLog, NULL);
+
+          std::cerr << "Error in kernel: " << std::endl;
+          std::cerr << buildLog;
+          delete [] buildLog;
+          clReleaseProgram(m_program);
+          return -1;
+        }
 
         m_kernelBuf = clCreateKernel(m_program, "bitwise_inv_buf_8uC1", &res);
         if (0 == m_kernelBuf || CL_SUCCESS != res)
