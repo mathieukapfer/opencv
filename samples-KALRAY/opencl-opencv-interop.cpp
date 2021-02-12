@@ -1,10 +1,11 @@
-/*
+// source: samples/opencl/opencl-opencv-interop.cpp
+
 // The example of interoperability between OpenCL and OpenCV.
 // This will loop through frames of video either from input media file
 // or camera device and do processing of these data in OpenCL and then
 // in OpenCV. In OpenCL it does inversion of pixels in left half of frame and
 // in OpenCV it does blurring in the right half of frame.
-*/
+
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -14,12 +15,14 @@
 #include <iomanip>
 #include <stdexcept>
 
-#define CL_USE_DEPRECATED_OPENCL_1_1_APIS
-#define CL_USE_DEPRECATED_OPENCL_1_2_APIS
-#define CL_USE_DEPRECATED_OPENCL_2_0_APIS // eliminate build warning
-#define CL_TARGET_OPENCL_VERSION 200  // 2.0
-
-#define BUILD_LOG_LENGTH 16384
+// Configuration is set thanks to "pkg-config --cflags kaf-core"
+// (see makefile - target configure)
+//
+//#define CL_USE_DEPRECATED_OPENCL_1_1_APIS
+//#define CL_USE_DEPRECATED_OPENCL_1_2_APIS
+//#define CL_USE_DEPRECATED_OPENCL_2_0_APIS
+//#define CL_TARGET_OPENCL_VERSION 200  // 2.0
+//#define CL_TARGET_OPENCL_VERSION 120  // 1.2
 
 #ifdef __APPLE__
 #define CL_SILENCE_DEPRECATION
@@ -152,7 +155,7 @@ public:
         query_param(id, CL_DEVICE_IMAGE_MAX_ARRAY_SIZE, m_image_max_array_size);
 #endif
         query_param(id, CL_DEVICE_MAX_SAMPLERS, m_max_samplers);
-#if defined(CL_VERSION_2_0)
+#if defined(CL_VERSION_1_2)
         query_param(id, CL_DEVICE_IMAGE_PITCH_ALIGNMENT, m_image_pitch_alignment);
         query_param(id, CL_DEVICE_IMAGE_BASE_ADDRESS_ALIGNMENT, m_image_base_address_alignment);
 #endif
@@ -612,6 +615,8 @@ int App::initOpenCL()
 
         std::string kernelSrc = "";
         kernelSrc = kernelSrc                         +
+            "__constant sampler_t sampler_test = "    +
+            "CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_NEAREST;" +
             "__kernel "                               +
             "void bitwise_inv_buf_8uC1("              +
             "    __global unsigned char* pSrcDst,"    +
@@ -627,10 +632,6 @@ int App::initOpenCL()
         if (m_deviceInfo.image_support())
         {
             kernelSrc = kernelSrc                              +
-                "__constant sampler_t sampler_test = "         +
-                "        CLK_NORMALIZED_COORDS_FALSE | "       +
-                "        CLK_ADDRESS_CLAMP_TO_EDGE   | "       +
-                "        CLK_FILTER_NEAREST;"                  +
                 "__kernel "                                    +
                 "void bitwise_inv_img_8uC1("                   +
                 "    read_only  image2d_t srcImg,"             +
@@ -654,13 +655,12 @@ int App::initOpenCL()
         res = clBuildProgram(m_program, 1, &m_device_id, 0, 0, 0);
         if (CL_SUCCESS != res) {
           // Determine the reason for the error
-          char *buildLog = new char[BUILD_LOG_LENGTH];
+          char buildLog[16384];
           clGetProgramBuildInfo(m_program, m_device_id, CL_PROGRAM_BUILD_LOG,
-                                BUILD_LOG_LENGTH, buildLog, NULL);
+                                sizeof(buildLog), buildLog, NULL);
 
           std::cerr << "Error in kernel: " << std::endl;
           std::cerr << buildLog;
-          delete [] buildLog;
           clReleaseProgram(m_program);
           return -1;
         }
