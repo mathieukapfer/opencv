@@ -45,6 +45,9 @@ help:
 	@echo "            <binary> : 'all_test' to execute the full test suite"
 	@echo "            <binary> : 'all_perf' to execute the full perf suite"
 	@echo
+	@echo "    Special target"
+	@echo "      make canny_perf_mppa      : execute canny test bench on mppa"
+	@echo
 	@echo "    Others examples: "
 	@echo "      make test-opencl-buffer   : build & run the 'example_opencl_opencl-opencv-interop'"
 	@echo
@@ -52,7 +55,7 @@ help:
 
 # install dependencies
 install-dep:
-	sudo apt install libavcodec-dev libavformat-dev libavresample-dev libavutil-dev libgstreamer-plugins-base1.0-dev libgstreamer1.0-dev libgstreamermm-1.0-dev libgtk2.0-dev
+	sudo apt install libavcodec-dev libavformat-dev libavresample-dev libavutil-dev libgstreamer-plugins-base1.0-dev libgstreamer1.0-dev libgstreamermm-1.0-dev libgtk2.0-dev emacs
 
 # clean
 clean:
@@ -113,8 +116,6 @@ clinfo:
 # ======================================================================================
 # run environment
 # ======================================================================================
-
-POCL_DEBUG=timing
 
 COMMUN_ENV=	\
   PATH=$(PATH):$(PWD)/build/bin \
@@ -237,3 +238,52 @@ test-opencl-buffer-mppa-spmd: example_opencl_opencl-opencv-interop
 	${COMMUN_ENV} \
 	${ENABLE_MPPA_IN_SPMD_MODE} \
 	POCL_DEBUG=${POCL_DEBUG} ./build/bin/example_opencl_opencl-opencv-interop --video=$(OPENCV_TEST_DATA_PATH)/cv/video/768x576.avi
+
+
+# ======================================================================================
+# Specific target for canny
+# ======================================================================================
+
+# enable POCL trace
+# options
+#POCL_DEBUG=all
+#POCL_DEBUG=1
+#POCL_DEBUG=0
+POCL_DEBUG=timing
+
+#GDB_ENABLE=gdb --args
+#VALGRING=valgrind
+#TIME=time
+
+build_perf_canny:
+		cd build && make opencv_perf_imgproc
+
+parser-with-timing:
+	emacs --batch --load $(PWD)/platforms/kvx/format_report.el --eval "(my-format-perf-report \"$(OUTPUT).log\")" | tee $(OUTPUT)_parsed.log
+	@echo
+	@echo "================================================================================="
+	@echo
+	@echo "Only with sobel:"
+	cat $(OUTPUT)_parsed.log | grep stage1_with_sobel | column -t
+
+canny_perf_gpu: build_perf_canny
+	@echo
+	@echo
+	POCL_DEBUG=$(POCL_DEBUG) \
+	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=256 \
+	${COMMUN_ENV} \
+  ${ENABLE_GPU} \
+	${TIME} ${VALGRING} opencv_perf_imgproc --perf_force_samples=$(FORCE_SAMPLE) \
+	--gtest_filter="*CL_CannyFixture_Canny.Canny*"  2>&1 | tee $@.log
+	OUTPUT=$@ make parser-with-timing
+
+canny_perf_mppa: build_perf_canny
+	@echo
+	@echo
+	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16 \
+	POCL_DEBUG=$(POCL_DEBUG) \
+	${COMMUN_ENV} \
+  ${ENABLE_MPPA_IN_SPMD_MODE} \
+	${TIME} ${VALGRING} opencv_perf_imgproc --perf_force_samples=$(FORCE_SAMPLE) \
+	--gtest_filter="*CL_CannyFixture_Canny.Canny/*" 2>&1 | tee $@.log
+	OUTPUT=$@ make parser-with-timing
