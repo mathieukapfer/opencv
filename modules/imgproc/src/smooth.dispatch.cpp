@@ -47,6 +47,7 @@
 
 #include <opencv2/core/utils/configuration.private.hpp>
 
+#include <ostream>
 #include <vector>
 #include <iostream>
 
@@ -321,7 +322,12 @@ static bool ocl_GaussianBlur_8UC1(InputArray _src, OutputArray _dst, Size ksize,
     const ocl::Device & dev = ocl::Device::getDefault();
     int type = _src.type(), sdepth = CV_MAT_DEPTH(type), cn = CV_MAT_CN(type);
 
-    if ( !(dev.isIntel() && (type == CV_8UC1) &&
+    std::cout << (!(dev.isIntel() || dev.isKalray()) && (type == CV_8UC1)) << std::endl;
+    std::cout << ((_src.offset() == 0) && (_src.step() % 4 == 0)) << std::endl;
+    std::cout << ((ksize.width == 5 && (_src.cols() % 4 == 0))) << std::endl;
+    std::cout << ((ksize.width == 3 && (_src.cols() % 16 == 0) && (_src.rows() % 2 == 0)))  << std::endl;
+
+    if ( !((dev.isIntel() || dev.isKalray()) && (type == CV_8UC1) &&
          (_src.offset() == 0) && (_src.step() % 4 == 0) &&
          ((ksize.width == 5 && (_src.cols() % 4 == 0)) ||
          (ksize.width == 3 && (_src.cols() % 16 == 0) && (_src.rows() % 2 == 0)))) )
@@ -341,6 +347,8 @@ static bool ocl_GaussianBlur_8UC1(InputArray _src, OutputArray _dst, Size ksize,
     size_t globalsize[2] = { 0, 0 };
     size_t localsize[2] = { 0, 0 };
 
+    std::cout << "ocl_GaussianBlur_8UC1: src size:" << _src.size() << "\n";
+
     if (ksize.width == 3)
     {
         globalsize[0] = size.width / 16;
@@ -351,6 +359,8 @@ static bool ocl_GaussianBlur_8UC1(InputArray _src, OutputArray _dst, Size ksize,
         globalsize[0] = size.width / 4;
         globalsize[1] = size.height / 1;
     }
+
+    std::cout << "ocl_GaussianBlur_8UC1: global size:" << globalsize[0] << "," << globalsize[1] << "\n";
 
     const char * const borderMap[] = { "BORDER_CONSTANT", "BORDER_REPLICATE", "BORDER_REFLECT", 0, "BORDER_REFLECT_101" };
     char build_opts[1024];
@@ -380,6 +390,8 @@ static bool ocl_GaussianBlur_8UC1(InputArray _src, OutputArray _dst, Size ksize,
     idxArg = kernel.set(idxArg, (int)dst.step);
     idxArg = kernel.set(idxArg, (int)dst.rows);
     idxArg = kernel.set(idxArg, (int)dst.cols);
+
+    std::cout << "ocl_GaussianBlur_8UC1: global size:" << globalsize[0] << "," << globalsize[1] << "(2) \n";
 
     return kernel.run(2, globalsize, (localsize[0] == 0) ? NULL : localsize, false);
 }
