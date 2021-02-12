@@ -204,6 +204,8 @@ public:
     CV_WRAP int maxWriteImageArgs() const;
     CV_WRAP int maxSamplers() const;
 
+    CV_WRAP size_t maxLocalMemSize() const;
+
     CV_WRAP size_t maxWorkGroupSize() const;
     CV_WRAP int maxWorkItemDims() const;
     void maxWorkItemSizes(size_t*) const;

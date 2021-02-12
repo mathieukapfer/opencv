@@ -39,7 +39,9 @@
 //
 //M*/
 
+#include "opencv2/core/cvdef.h"
 #include "precomp.hpp"
+#include <iomanip>
 
 #ifndef HAVE_OPENCL
 #include "ocl_disabled.impl.hpp"
@@ -75,14 +77,14 @@
 #include "opencv2/core/utils/allocator_stats.impl.hpp"
 #undef CV__ALLOCATOR_STATS_LOG
 
-#define CV_OPENCL_ALWAYS_SHOW_BUILD_LOG          0
+#define CV_OPENCL_ALWAYS_SHOW_BUILD_LOG          1
 
-#define CV_OPENCL_SHOW_RUN_KERNELS               0
-#define CV_OPENCL_TRACE_CHECK                    0
+#define CV_OPENCL_SHOW_RUN_KERNELS               1
+#define CV_OPENCL_TRACE_CHECK                    1
 
 #define CV_OPENCL_VALIDATE_BINARY_PROGRAMS       1
 
-#define CV_OPENCL_SHOW_SVM_ERROR_LOG             1
+#define CV_OPENCL_SHOW_SVM_ERROR_LOG             0
 #define CV_OPENCL_SHOW_SVM_LOG                   0
 
 #include "opencv2/core/bufferpool.hpp"
@@ -150,11 +152,19 @@ static bool isRaiseError()
 }
 #endif
 
+static int64 GLOBAL_TICK_REF = cv::getTickCount();
+
 #if CV_OPENCL_TRACE_CHECK
 static inline
 void traceOpenCLCheck(cl_int status, const char* message)
 {
-    std::cout << "OpenCV(OpenCL:" << status << "): " << message << std::endl << std::flush;
+  int64 tick = cv::getTickCount();
+  double t = (double) (tick - GLOBAL_TICK_REF) / cv::getTickFrequency();
+  // GLOBAL_TICK_REF = tick;
+
+  std::cout << std::fixed << std::setprecision(6) << t << " ["
+            << std::fixed << std::setprecision(6) << tick - GLOBAL_TICK_REF << "] "
+            <<  "OpenCV(OpenCL:" << status << "): " << message << std::endl << std::flush;
 }
 #define CV_OCL_TRACE_CHECK_RESULT(status, message) traceOpenCLCheck(status, message)
 #else
@@ -1909,6 +1919,9 @@ int Device::maxWriteImageArgs() const
 
 int Device::maxSamplers() const
 { return p ? p->getProp<cl_uint, int>(CL_DEVICE_MAX_SAMPLERS) : 0; }
+
+size_t Device::maxLocalMemSize() const
+{ return p ? p->getProp<cl_ulong, size_t>(CL_DEVICE_LOCAL_MEM_SIZE) : 0; }
 
 size_t Device::maxWorkGroupSize() const
 { return p ? p->maxWorkGroupSize_ : 0; }
@@ -4621,6 +4634,10 @@ Program Context::Impl::getProg(const ProgramSource& src,
             src_->module_.c_str(), src_->name_.c_str(), src_->sourceHash_.c_str(),
             getPrefixString().c_str(),
             buildflags.c_str());
+    std::cout
+      << "----------------------  " << std::endl
+      << "build info:" << std::endl << key << std::endl
+      << "----------------------  " << std::endl;
     {
         cv::AutoLock lock(program_cache_mutex);
         phash_t::iterator it = phash.find(key);
