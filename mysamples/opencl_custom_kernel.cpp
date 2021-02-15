@@ -155,12 +155,7 @@ int main(int argc, char** argv)
         imshow("Source", src);
         imshow("Result", result);
 
-        for (;;)
-        {
-            int key = waitKey();
-            if (key == 27/*ESC*/ || key == 'q' || key == 'Q')
-                break;
-        }
+        waitKey();
     }
     return 0;
 }

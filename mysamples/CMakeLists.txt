@@ -43,13 +43,6 @@ add_executable(my_example_filter my_example_filter.cpp)
 target_link_libraries(my_example_filter PRIVATE ${OpenCV_LIBS})
 
 
-#/usr/bin/c++
-set(CMAKE_CXX_FLAGS "-D_USE_MATH_DEFINES -D__OPENCV_BUILD=1 -D__OPENCV_TESTS=1 -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -I/home/kapfer/Project/opencv/build/3rdparty/ippicv/ippicv_lnx/icv/include -I/home/kapfer/Project/opencv/build/3rdparty/ippicv/ippicv_lnx/iw/include -I/home/kapfer/Project/opencv/build -I/home/kapfer/Project/opencv/modules/ts/include -I/home/kapfer/Project/opencv/modules/imgproc/include -I/home/kapfer/Project/opencv/modules/imgcodecs/include -I/home/kapfer/Project/opencv/modules/videoio/include -I/home/kapfer/Project/opencv/modules/core/include -I/home/kapfer/Project/opencv/modules/highgui/include  -fsigned-char -W -Wall -Werror=return-type -Werror=non-virtual-dtor -Werror=address -Werror=sequence-point -Wformat -Werror=format-security -Wmissing-declarations -Wundef -Winit-self -Wpointer-arith -Wshadow -Wsign-promo -Wuninitialized -Winit-self -Wsuggest-override -Wno-delete-non-virtual-dtor -Wno-comment -Wimplicit-fallthrough=3 -Wno-strict-overflow -fdiagnostics-show-option -Wno-long-long -pthread -fomit-frame-pointer -ffunction-sections -fdata-sections  -fvisibility=hidden -fvisibility-inlines-hidden -O0 -g -DDEBUG   -fPIE   -std=c++11")
-
-#set(CMAKE_CXX_FLAGS "-D_USE_MATH_DEFINES -D__OPENCV_BUILD=1 -D__OPENCV_TESTS=1 -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -I/home/kapfer/Project/opencv/build/3rdparty/ippicv/ippicv_lnx/icv/include -I/home/kapfer/Project/opencv/build/3rdparty/ippicv/ippicv_lnx/iw/include -I/home/kapfer/Project/opencv/build -I/home/kapfer/Project/opencv/modules/ts/include -I/home/kapfer/Project/opencv/modules/imgproc/include -I/home/kapfer/Project/opencv/modules/imgcodecs/include -I/home/kapfer/Project/opencv/modules/videoio/include -I/home/kapfer/Project/opencv/modules/core/include -I/home/kapfer/Project/opencv/modules/highgui/include  -fsigned-char -W -Wall -Werror=return-type -Werror=non-virtual-dtor -Werror=address -Werror=sequence-point -Wformat -Werror=format-security -Wmissing-declarations -Wundef -Winit-self -Wpointer-arith -Wshadow -Wsign-promo -Wuninitialized -Winit-self -Wsuggest-override -Wno-delete-non-virtual-dtor -Wno-comment -Wimplicit-fallthrough=3 -Wno-strict-overflow -fdiagnostics-show-option -Wno-long-long -pthread -fomit-frame-pointer -ffunction-sections -fdata-sections  -msse -msse2 -msse3 -fvisibility=hidden -fvisibility-inlines-hidden -O3 -DNDEBUG  -DNDEBUG -fPIE   -std=c++11")
-
-#set(CMAKE_CXX_FLAGS="-fsigned-char -W -Wall -Werror=return-type -Werror=non-virtual-dtor -Werror=address -Werror=sequence-point -Wformat -Werror=format-security -Wmissing-declarations -Wundef -Winit-self -Wpointer-arith -Wshadow -Wsign-promo -Wuninitialized -Winit-self -Wsuggest-override -Wno-delete-non-virtual-dtor -Wno-comment -Wimplicit-fallthrough=3 -Wno-strict-overflow -fdiagnostics-show-option -Wno-long-long -pthread -fomit-frame-pointer -ffunction-sections -fdata-sections  -msse -msse2 -msse3 -fvisibility=hidden -fvisibility-inlines-hidden -O3 -DNDEBUG  -DNDEBUG")
-
 # Declare the executable target built from your sources
 add_executable(mandelbrote mandelbrote.cpp)
 
@@ -69,3 +62,17 @@ add_executable(opencl_custom_kernel opencl_custom_kernel.cpp)
 
 # Link your application with OpenCV libraries
 target_link_libraries(opencl_custom_kernel PRIVATE ${OpenCV_LIBS})
+
+
+# Add opencl include and lib
+set(OpenCL_INCLUDE_DIR $ENV{KALRAY_TOOLCHAIN_DIR})
+message("OpenCL_INCLUDE_DIR=${OpenCL_INCLUDE_DIR}")
+
+# Declare the executable target built from your sources
+add_executable(opencl-opencv-interop opencl-opencv-interop.cpp)
+
+# Link your application with OpenCV libraries
+target_link_libraries(opencl-opencv-interop PRIVATE ${OpenCV_LIBS} ${OpenCL_INCLUDE_DIR}/lib/libOpenCL.so)
+
+#set(CMAKE_MODULE_PATH=${KALRAY_TOOLCHAIN_DIR})
+target_include_directories(opencl-opencv-interop SYSTEM PUBLIC ${OpenCL_INCLUDE_DIR}/include)
