@@ -10,25 +10,24 @@ MSG_CHECK_ENV_TOOCHAIN= $(if $(KALRAY_TOOLCHAIN_DIR), \
 
 MSG_CHECK_ENV_OPENCV_DATA= $(if $(wildcard $(OPENCV_TEST_DATA_PATH)*), \
 	"$(OPENCV_TEST_DATA_PATH)", \
-	"is not set")
+	"should be set to <path_to>/opencv_extra/testdata")
 
 # helper
 # ----------
 help:
 	@echo
+	@echo " First, check your environment: "
+	@echo "   - KALRAY_TOOLCHAIN_DIR:  $(MSG_CHECK_ENV_TOOCHAIN)"
+	@echo "   - OPENCV_TEST_DATA_PATH: $(MSG_CHECK_ENV_OPENCV_DATA)"
+	@echo
 	@echo " make configure:   create build dir for compilation"
 	@echo " make compile:     build all targets"
 	@echo " make <prg>:       build & execute one program"
 	@echo
-	@echo " <prg> "
+	@echo " list of <prg>: "
 	@echo "  transparent_api:        a demo code of tapi that use BRD2GARY, gaussian, canny "
 	@echo "  opencl_custom_kernel:   a demo to work on custom kernel (from opencv)"
 	@echo "  opencl-opencv-interop:  a demo to work on both opencl & opencv (from opencv)"
-	@echo
-	@echo "    Check your environment: "
-	@echo
-	@echo "      KALRAY_TOOLCHAIN_DIR:  $(MSG_CHECK_ENV_TOOCHAIN)"
-	@echo "      OPENCV_TEST_DATA_PATH: $(MSG_CHECK_ENV_OPENCV_DATA)"
 	@echo
 
 # configure
@@ -108,7 +107,6 @@ opencl-opencv-interop:
 	cd build && make $@
 	$(RUN_ENV) \
 	./build/$@ 2>&1  --video=$(OPENCV_TEST_DATA_PATH)/cv/video/768x576.avi  | tee $@.log
-	OUTPUT=$@ make parser-with-timing
 
 ## generic target
 %: build/%

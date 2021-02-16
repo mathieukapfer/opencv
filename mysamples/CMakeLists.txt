@@ -22,33 +22,6 @@ message(STATUS "    include path: ${OpenCV_INCLUDE_DIRS}")
 # Lsp mode
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Declare the executable target built from your sources
-add_executable(opencv_example example.cpp)
-
-# Link your application with OpenCV libraries
-target_link_libraries(opencv_example PRIVATE ${OpenCV_LIBS})
-
-
-# Declare the executable target built from your sources
-add_executable(my_example my_example.cpp)
-
-# Link your application with OpenCV libraries
-target_link_libraries(my_example PRIVATE ${OpenCV_LIBS})
-
-
-# Declare the executable target built from your sources
-add_executable(my_example_filter my_example_filter.cpp)
-
-# Link your application with OpenCV libraries
-target_link_libraries(my_example_filter PRIVATE ${OpenCV_LIBS})
-
-
-# Declare the executable target built from your sources
-add_executable(mandelbrote mandelbrote.cpp)
-
-# Link your application with OpenCV libraries
-target_link_libraries(mandelbrote PRIVATE ${OpenCV_LIBS})
-
 
 # Declare the executable target built from your sources
 add_executable(transparent_api transparent_api.cpp)
@@ -72,7 +45,7 @@ message("OpenCL_INCLUDE_DIR=${OpenCL_INCLUDE_DIR}")
 add_executable(opencl-opencv-interop opencl-opencv-interop.cpp)
 
 # Link your application with OpenCV libraries
-target_link_libraries(opencl-opencv-interop PRIVATE ${OpenCV_LIBS} ${OpenCL_INCLUDE_DIR}/lib/libOpenCL.so)
+target_link_libraries(opencl-opencv-interop PRIVATE ${OpenCV_LIBS} libOpenCL.so)
 
 #set(CMAKE_MODULE_PATH=${KALRAY_TOOLCHAIN_DIR})
 target_include_directories(opencl-opencv-interop SYSTEM PUBLIC ${OpenCL_INCLUDE_DIR}/include)
