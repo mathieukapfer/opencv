@@ -1910,6 +1910,9 @@ int Device::maxWriteImageArgs() const
 int Device::maxSamplers() const
 { return p ? p->getProp<cl_uint, int>(CL_DEVICE_MAX_SAMPLERS) : 0; }
 
+size_t Device::maxLocalMemSize() const
+{ return p ? p->getProp<cl_ulong, size_t>(CL_DEVICE_LOCAL_MEM_SIZE) : 0; }
+
 size_t Device::maxWorkGroupSize() const
 { return p ? p->maxWorkGroupSize_ : 0; }
 
