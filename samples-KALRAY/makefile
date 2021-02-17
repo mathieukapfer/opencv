@@ -4,13 +4,18 @@ OPENCV_SRC_DIR=$(PWD)/..
 
 POCL_CACHE_DIR=$(PWD)/.cache/pocl
 
-MSG_CHECK_ENV_TOOCHAIN= $(if $(KALRAY_TOOLCHAIN_DIR), \
-	"$(KALRAY_TOOLCHAIN_DIR)", \
-	"is not set, please source ../../kEnv/kvxtools/.switch_env")
+ifeq ($(KALRAY_TOOLCHAIN_DIR),)
+	MSG_CHECK_ENV_TOOCHAIN:="not set"
+else
+	MSG_CHECK_ENV_TOOCHAIN:=$(KALRAY_TOOLCHAIN_DIR)
+endif
 
-MSG_CHECK_ENV_OPENCV_DATA= $(if $(wildcard $(OPENCV_TEST_DATA_PATH)*), \
-	"$(OPENCV_TEST_DATA_PATH)", \
-	"should be set to <path_to>/opencv_extra/testdata")
+ifeq ($(OPENCV_TEST_DATA_PATH),)
+	MSG_CHECK_ENV_OPENCV_DATA:= \
+	"should be set to \<path_to\>/opencv_extra/testdata \(https://github.com/opencv/opencv_extra.git\)"
+else
+	MSG_CHECK_ENV_OPENCV_DATA:=$(OPENCV_TEST_DATA_PATH)
+endif
 
 # helper
 # ----------
@@ -87,6 +92,7 @@ RUN_ENV=$(RUN_ENV_MPPA)
 #IMAGE=$(OPENCV_SRC_DIR)/samples/data/lena.jpg
 #IMAGE=$(OPENCV_SRC_DIR)/samples/data/graf3.png
 #IMAGE=$(OPENCV_TEST_DATA_PATH)/cv/shared/fruits.png
+IMAGE=$(OPENCV_TEST_DATA_PATH)/cv/shared/lena.png
 #IMAGE=$(OPENCV_TEST_DATA_PATH)/cv/shared/baboon.png
 #IMAGE=$(OPENCV_TEST_DATA_PATH)/cv/shared/1_itseez-0001438.png
 #IMAGE=$(OPENCV_TEST_DATA_PATH)/cv/../gpu/stereobm/aloe-L.png

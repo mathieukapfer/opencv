@@ -20,3 +20,11 @@
        $ make configure
        $ make compile
        $ make canny_perf_mppa
+
+ - Some other examples are also available in ./samples-KALRAY
+       $ cd ./samples-KALRAY
+       $ make configure
+       $ make compile
+       $ make opencl-opencv-interop
+       $ make opencl_custom_kernel
+       $ make transparent_api

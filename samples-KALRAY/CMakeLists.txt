@@ -42,10 +42,10 @@ set(OpenCL_INCLUDE_DIR $ENV{KALRAY_TOOLCHAIN_DIR})
 message("OpenCL_INCLUDE_DIR=${OpenCL_INCLUDE_DIR}")
 
 # Declare the executable target built from your sources
-add_executable(opencl-opencv-interop opencl-opencv-interop.cpp)
+add_executable(opencl-opencv-interop ../samples/opencl/opencl-opencv-interop.cpp)
 
 # Link your application with OpenCV libraries
-target_link_libraries(opencl-opencv-interop PRIVATE ${OpenCV_LIBS} libOpenCL.so)
+target_link_libraries(opencl-opencv-interop PRIVATE ${OpenCV_LIBS} $ENV{KALRAY_TOOLCHAIN_DIR}/lib/libOpenCL.so)
 
 #set(CMAKE_MODULE_PATH=${KALRAY_TOOLCHAIN_DIR})
 target_include_directories(opencl-opencv-interop SYSTEM PUBLIC ${OpenCL_INCLUDE_DIR}/include)
