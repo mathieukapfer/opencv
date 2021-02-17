@@ -48,9 +48,6 @@ help:
 	@echo "    Special target"
 	@echo "      make canny_perf_mppa      : execute canny test bench on mppa"
 	@echo
-	@echo "    Others examples: "
-	@echo "      make test-opencl-buffer   : build & run the 'example_opencl_opencl-opencv-interop'"
-	@echo
 
 
 # install dependencies
@@ -220,25 +217,6 @@ run_mppa_%: build/bin/opencv_%
 	POCL_DEBUG=$(POCL_DEBUG) \
 	$< --perf_force_samples=$(FORCE_SAMPLE) \
 	--gtest_filter="*CL*"
-
-# ======================================================================================
-# Specific target for opencl-opencv-interop
-# ======================================================================================
-
-example_opencl_opencl-opencv-interop:
-	cd build && make example_opencl_opencl-opencv-interop
-
-### work groupe size = 256
-test-opencl-buffer: example_opencl_opencl-opencv-interop
-	${COMMUN_ENV} \
-	./build/bin/example_opencl_opencl-opencv-interop --video=$(OPENCV_TEST_DATA_PATH)/cv/video/768x576.avi
-
-### work groupe size = 16
-test-opencl-buffer-mppa-spmd: example_opencl_opencl-opencv-interop
-	${COMMUN_ENV} \
-	${ENABLE_MPPA_IN_SPMD_MODE} \
-	POCL_DEBUG=${POCL_DEBUG} ./build/bin/example_opencl_opencl-opencv-interop --video=$(OPENCV_TEST_DATA_PATH)/cv/video/768x576.avi
-
 
 # ======================================================================================
 # Specific target for canny

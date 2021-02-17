@@ -1,7 +1,7 @@
 
 ## How to use OpenCV with MPPA platform
 
- - Get the makefile helper thank to dynamic link:
+ - Get the makefile helper thanks to dynamic link:
 
       $ ln -s platforms/kvx/makefile .
 
