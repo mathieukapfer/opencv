@@ -501,8 +501,12 @@ __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src
     event_t event_write[2] = {0, 0};
 
     // block to copy
-    int2 block_size   = {(GRP_SIZEX + 4) + halo_cutoff(iblock_x_next, num_blocks_x),
-                         (GRP_SIZEY + 4) + halo_cutoff(iblock_y_next, num_blocks_y)};
+    // clamp if any last block exceeds the remaining size
+    // Assumption: there are at least >= 2 blocks in each row and col dimension
+    const int2 block_output_first = {clamp(GRP_SIZEX, GRP_SIZEX, cols - (GRP_SIZEX * iblock_x_next)),
+                                     clamp(GRP_SIZEY, GRP_SIZEY, rows - (GRP_SIZEY * iblock_y_next))};
+    int2 block_size   = {(block_output_first.x + 4) + halo_cutoff(iblock_x_next, num_blocks_x),
+                         (block_output_first.y + 4) + halo_cutoff(iblock_y_next, num_blocks_y)};
 
     // local write position and dimension
     int4 local_point  = {0 + local_offset(iblock_x_next, num_blocks_x),
@@ -547,8 +551,12 @@ __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src
         iblock_x_next = iblock_next % num_blocks_x;
         iblock_y_next = iblock_next / num_blocks_x;
 
-        const int2 block_size_next = {(GRP_SIZEX + 4) + halo_cutoff(iblock_x_next, num_blocks_x),
-                                      (GRP_SIZEY + 4) + halo_cutoff(iblock_y_next, num_blocks_y)};
+        // clamp if any last block exceeds the remaining size
+        // Assumption: there are at least >= 2 blocks in each row and col dimension
+        const int2 block_output_next = {clamp(GRP_SIZEX, GRP_SIZEX, cols - (GRP_SIZEX * iblock_x_next)),
+                                        clamp(GRP_SIZEY, GRP_SIZEY, rows - (GRP_SIZEY * iblock_y_next))};
+        const int2 block_size_next = {(block_output_next.x + 4) + halo_cutoff(iblock_x_next, num_blocks_x),
+                                      (block_output_next.y + 4) + halo_cutoff(iblock_y_next, num_blocks_y)};
         const int2 local_pos_next  = {0 + local_offset(iblock_x_next, num_blocks_x),
                                       0 + local_offset(iblock_y_next, num_blocks_y)};
         const int2 global_pos_next = {(GRP_SIZEX * iblock_x_next) + remote_offset(iblock_x_next, num_blocks_x),
