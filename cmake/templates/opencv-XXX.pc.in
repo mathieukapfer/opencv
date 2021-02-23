@@ -1,6 +1,6 @@
 # Package Information for pkg-config
 
-prefix=@prefix@
+prefix=$KALRAY_TOOLCHAIN_DIR
 exec_prefix=@exec_prefix@
 libdir=@libdir@
 includedir=@includedir@
