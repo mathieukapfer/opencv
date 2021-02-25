@@ -176,18 +176,23 @@ IMPLEMENT_ASYNC_COPY_2D2D_FUNCS(float, "%.3f");
 #endif
 #define storepix(value, addr) *(__global int *)(addr) = (int)(value)
 
-#define IN_WIDTH (GRP_SIZEX + 4)
-#define IN_HEIGHT (GRP_SIZEY + 4)
+#define IN_WIDTH  (GRP_SIZEX + 2 + APRT-1)
+#define IN_HEIGHT (GRP_SIZEY + 2 + APRT-1)
 #define IN_OFFSET_Y(cur, dist) ((cur) + (dist) * IN_WIDTH)
 
-#define MAG_WIDTH (GRP_SIZEX + 2)
+#define MAG_WIDTH  (GRP_SIZEX + 2)
 #define MAG_HEIGHT (GRP_SIZEY + 2)
 #define MAG_OFFSET_Y(cur, dist) ((cur) + (dist) * MAG_WIDTH)
 
-#define OUT_WIDTH (GRP_SIZEX + 0)
+#define OUT_WIDTH  (GRP_SIZEX + 0)
 #define OUT_HEIGHT (GRP_SIZEY + 0)
 #define OUT_OFFSET_Y(cur, dist) ((cur) + (dist) * OUT_WIDTH)
 
+#ifdef L2GRAD
+#define dist(x, y) ((int)(x) * (x) + (int)(y) * (y))
+#else
+#define dist(x, y) (abs((int)(x)) + abs((int)(y)))
+#endif
 
 /*
     stage1_with_sobel:
@@ -197,21 +202,7 @@ IMPLEMENT_ASYNC_COPY_2D2D_FUNCS(float, "%.3f");
         Double thresholding
 */
 
-__constant int prev[4][2] = {
-    { 0, -1 },
-    { -1, 1 },
-    { -1, 0 },
-    { -1, -1 }
-};
-
-__constant int next[4][2] = {
-    { 0, 1 },
-    { 1, -1 },
-    { 1, 0 },
-    { 1, 1 }
-};
-
-inline int3 sobel(int idx, __local const shortN *smem)
+inline int3 sobel_3x3(int idx, __local const shortN *smem)
 {
     // result: x, y, mag
     int3 res;
@@ -283,12 +274,11 @@ inline int3 sobel(int idx, __local const shortN *smem)
     return res;
 }
 
-static inline void stage1_with_sobel_compute_block(
-    int start_x, int start_y,
+static inline void stage1_singlepass_sobel_compute_block(
     __local shortN *smem,
-    __local short *magx, __local short *magy, __local int *magz,
-    __local uchar *map_out,
-    int rows, int cols, float low_thr, float high_thr)
+    __local short *magx,
+    __local short *magy,
+    __local int *magz)
 {
     // Sobel, Magnitude
     int nb_pe = get_local_size(1) * get_local_size(0);
@@ -305,7 +295,7 @@ static inline void stage1_with_sobel_compute_block(
         for (int x = 0; x < MAG_WIDTH / 16; x++) {
             #pragma unroll
             for (int iter = 0; iter < 16; iter++) {
-                s = sobel(in_idx, smem);
+                s = sobel_3x3(in_idx, smem);
                 magx[mag_idx] = s.x;
                 magy[mag_idx] = s.y;
                 magz[mag_idx] = s.z;
@@ -314,7 +304,7 @@ static inline void stage1_with_sobel_compute_block(
             }
         }
         for (int x = 0; x < MAG_WIDTH % 16; x++) {
-            s = sobel(in_idx, smem);
+            s = sobel_3x3(in_idx, smem);
             magx[mag_idx] = s.x;
             magy[mag_idx] = s.y;
             magz[mag_idx] = s.z;
@@ -322,10 +312,89 @@ static inline void stage1_with_sobel_compute_block(
             in_idx++;
         }
     }
+}
 
-    // Wait for all magnitudes to be computed. Needed for the first/last
-    // lines for the WIs.
+inline void sobel_sep_row(int in_idx, int out_idx, __local const shortN *smem, __local short *half_dx,__local short *half_dy, const short *kx, const short *ky)
+{
+    short sum_x = 0, sum_y = 0;
+    int start_x = in_idx - (APRT>>1);
+    for (int i=0; i<APRT; i++)
+    {
+        sum_x += smem[start_x + i] * kx[i];
+        sum_y += smem[start_x + i] * ky[i];
+    }
+    half_dx[out_idx] = sum_x;
+    half_dy[out_idx] = sum_y;
+}
+
+inline void sobel_sep_col(int idx, __local const short *half_d, __local short *d, const short *k)
+{
+    short sum = 0;
+    for (int i=0; i<APRT; i++)
+    {
+        sum += half_d[MAG_OFFSET_Y(idx, i)] * k[i];
+    }
+    d[idx] = sum;
+}
+
+static inline void stage1_separable_sobel_compute_block(
+    __local shortN *smem,
+    __local short *half_dx,
+    __local short *half_dy,
+    __local short *dx,
+    __local short *dy,
+    __local int *magz)
+{
+    // Sobel, Magnitude
+    int nb_pe = get_local_size(1) * get_local_size(0);
+    int cur_pe = get_local_id(0) * get_local_size(1) + get_local_id(1);
+
+    int start_in_row = IN_HEIGHT * cur_pe / nb_pe;
+    int end_in_row = IN_HEIGHT * (cur_pe + 1) / nb_pe;
+
+    // TODO generate kernel
+    const short kx_x[5] = {-1,-2,0,2,1};
+    const short ky[5] = {1,4,6,4,1};
+    for (int y = start_in_row; y < end_in_row; y++) {
+        int out_idx = MAG_OFFSET_Y(0, y);
+        int in_idx = IN_OFFSET_Y(APRT>>1, y);
+        for(int x=0;x<MAG_WIDTH;x++)
+        {
+            sobel_sep_row(in_idx, out_idx, smem, half_dx, half_dy, kx_x, ky);
+            in_idx++;
+            out_idx++;
+        }
+    }
+
+    // wait for the horizontal part of separable filters (dx and dy) to be complete
     barrier(CLK_LOCAL_MEM_FENCE);
+
+    int start_mag_row = MAG_HEIGHT * cur_pe / nb_pe;
+    int end_mag_row = MAG_HEIGHT * (cur_pe + 1) / nb_pe;
+    const short kx_y[5] = {1,2,0,-2,-1};
+    // TODO compare horizontal versus vertical iteration for vertical filtering.
+    // Which one maximize cache hit ? (probably depends on aperture size)
+    for (int y = start_mag_row; y < end_mag_row; y++) {
+        int idx = MAG_OFFSET_Y(0, y);
+        for(int x=0;x<MAG_WIDTH;x++)
+        {
+            sobel_sep_col(idx, half_dx, dx, ky);
+            sobel_sep_col(idx, half_dy, dy, kx_y);
+            magz[idx] = dist(dx[idx], dy[idx]);
+            idx++;
+        }
+    }
+}
+
+static inline void stage1_nms_compute_block(
+    __local short *magx,
+    __local short *magy,
+    __local int *magz,
+    __local uchar *map_out,
+    int rows, float low_thr, float high_thr)
+{
+    int nb_pe = get_local_size(1) * get_local_size(0);
+    int cur_pe = get_local_id(0) * get_local_size(1) + get_local_id(1);
 
     // NMS work split computation.
     int remaining_rows = min((int)(rows - get_group_id(1) * OUT_HEIGHT), (int)OUT_HEIGHT);
@@ -427,44 +496,54 @@ static inline void stage1_with_sobel_compute_block(
 // https://hal.univ-grenoble-alpes.fr/hal-01652614/document
 static inline int local_offset(const int iblock, const int num_blocks)
 {
-    return (iblock == 0 ? 2 : 0);
+    return (iblock == 0 ? 1 + (APRT>>1) : 0);
 }
 static inline int remote_offset(const int iblock, const int num_blocks)
 {
-    return (iblock == 0 ? 0 : -2);
+    return (iblock == 0 ? 0 : -1 -(APRT>>1));
 }
 static inline int halo_cutoff(const int iblock, const int num_blocks)
 {
-    return ((iblock > 0 && iblock < (num_blocks - 1)) ? 0 : -2);
+    return ((iblock > 0 && iblock < (num_blocks - 1)) ? 0 : -1 - (APRT>>1));
 }
 
 __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src_offset, int rows, int cols,
                                 __global uchar *map, int map_step, int map_offset,
                                 float low_thr, float high_thr)
 {
-    //                        GRP_SIZEX+4
-    //             +--------------------------------+
-    //             |                                |
-    //             |    +----------------------+    |
-    //             |    |      GRP_SIZEX       |    |
-    //             |    |                      |    |
-    //             |    |                      |    |
-    // GRP_SIZEY+4 |    | GRP_SIZEY            |    |
-    //             |    |                      |    |
-    //             |    |                      |    |
-    //             |    +----------------------+    |
-    //             |                                |
-    //             +--------------------------------+
+    //                                GRP_SIZEX + 2 + APRT-1
+    //                         +--------------------------------+
+    //                         |                                |
+    //                         |    +----------------------+    |
+    //                         |    |      GRP_SIZEX       |    |
+    //                         |    |                      |    |
+    //                         |    |                      |    |
+    // GRP_SIZEY + 2 + APRT-1  |    | GRP_SIZEY            |    |
+    //                         |    |                      |    |
+    //                         |    |                      |    |
+    //                         |    +----------------------+    |
+    //                         |                                |
+    //                         +--------------------------------+
     //
-    __local TYPEN  smem_src_even[(GRP_SIZEX + 4) * (GRP_SIZEY + 4)];
-    __local TYPEN  smem_src_odd [(GRP_SIZEX + 4) * (GRP_SIZEY + 4)];
+
+    // input double buffer
+    __local TYPEN  smem_src_even[IN_WIDTH * IN_HEIGHT];
+    __local TYPEN  smem_src_odd [IN_WIDTH * IN_HEIGHT];
     __local TYPEN *smem_src[2] = {smem_src_even, smem_src_odd};
 
-    __local shortN smem    [(GRP_SIZEX + 4) * (GRP_SIZEY + 4)];
-    __local short  magx    [(GRP_SIZEX + 2) * (GRP_SIZEY + 2)];
-    __local short  magy    [(GRP_SIZEX + 2) * (GRP_SIZEY + 2)];
-    __local int    magz    [(GRP_SIZEX + 2) * (GRP_SIZEY + 2)];
+    __local shortN smem [IN_WIDTH * IN_HEIGHT];
 
+    __local short  magx[MAG_WIDTH * MAG_HEIGHT];
+    __local short  magy[MAG_WIDTH * MAG_HEIGHT];
+#if APRT > 3
+    // TODO separable sobel only supports cn==1
+    // separable sobel buffers
+    __local short half_dx[MAG_WIDTH * IN_HEIGHT];
+    __local short half_dy[MAG_WIDTH * IN_HEIGHT];
+#endif
+    __local int magz[MAG_WIDTH * MAG_HEIGHT];
+
+    // output double buffers
     __local uchar map_out_even[GRP_SIZEX * GRP_SIZEY];
     __local uchar map_out_odd [GRP_SIZEX * GRP_SIZEY];
     __local uchar *map_out[2] = {map_out_even, map_out_odd};
@@ -489,11 +568,6 @@ __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src
     const int iblock_begin = group_id * num_blocks_per_group + min(group_id, num_blocks_trailing);
     const int iblock_end   = iblock_begin + num_blocks_per_group + ((group_id < num_blocks_trailing) ? 1 : 0);
 
-    // if (lidx == 0 && lidy == 0) {
-    //     printf("Group %3d doing blocks from %3d to %3d = %3d blocks\n",
-    //         group_id, iblock_begin, iblock_end, (iblock_end - iblock_begin));
-    // }
-
     int iblock_x_next = iblock_begin % num_blocks_x;
     int iblock_y_next = iblock_begin / num_blocks_x;
 
@@ -505,14 +579,14 @@ __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src
     // Assumption: there are at least >= 2 blocks in each row and col dimension
     const int2 block_output_first = {clamp(GRP_SIZEX, GRP_SIZEX, cols - (GRP_SIZEX * iblock_x_next)),
                                      clamp(GRP_SIZEY, GRP_SIZEY, rows - (GRP_SIZEY * iblock_y_next))};
-    int2 block_size   = {(block_output_first.x + 4) + halo_cutoff(iblock_x_next, num_blocks_x),
-                         (block_output_first.y + 4) + halo_cutoff(iblock_y_next, num_blocks_y)};
+    int2 block_size   = {(block_output_first.x + 2 + APRT-1) + halo_cutoff(iblock_x_next, num_blocks_x),
+                         (block_output_first.y + 2 + APRT-1) + halo_cutoff(iblock_y_next, num_blocks_y)};
 
     // local write position and dimension
     int4 local_point  = {0 + local_offset(iblock_x_next, num_blocks_x),
                          0 + local_offset(iblock_y_next, num_blocks_y),
-                         (GRP_SIZEX + 4),
-                         (GRP_SIZEY + 4)};
+                         IN_WIDTH,
+                         IN_HEIGHT};
 
     // global read position and dimension
     int4 global_point = {(GRP_SIZEX * iblock_x_next) + remote_offset(iblock_x_next, num_blocks_x),
@@ -555,8 +629,8 @@ __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src
         // Assumption: there are at least >= 2 blocks in each row and col dimension
         const int2 block_output_next = {clamp(GRP_SIZEX, GRP_SIZEX, cols - (GRP_SIZEX * iblock_x_next)),
                                         clamp(GRP_SIZEY, GRP_SIZEY, rows - (GRP_SIZEY * iblock_y_next))};
-        const int2 block_size_next = {(block_output_next.x + 4) + halo_cutoff(iblock_x_next, num_blocks_x),
-                                      (block_output_next.y + 4) + halo_cutoff(iblock_y_next, num_blocks_y)};
+        const int2 block_size_next = {(block_output_next.x + 2 + APRT-1) + halo_cutoff(iblock_x_next, num_blocks_x),
+                                      (block_output_next.y + 2 + APRT-1) + halo_cutoff(iblock_y_next, num_blocks_y)};
         const int2 local_pos_next  = {0 + local_offset(iblock_x_next, num_blocks_x),
                                       0 + local_offset(iblock_y_next, num_blocks_y)};
         const int2 global_pos_next = {(GRP_SIZEX * iblock_x_next) + remote_offset(iblock_x_next, num_blocks_x),
@@ -590,23 +664,23 @@ __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src
         // =========================================================
         // padding: cast uchar to float and pad halo pixels
         // =========================================================
-        // each WI will read a row of smem_src[(GRP_SIZEY + 4)][(GRP_SIZEX + 4)],
-        // cast to float and write to     smem[(GRP_SIZEY + 4)][(GRP_SIZEX + 4)]
-        for(int irow = wid; irow < (GRP_SIZEY + 4); irow += (lsizex * lsizey))
+        // each WI will read a row of smem_src[(IN_HEIGHT)][(IN_WIDTH)],
+        // cast to float and write to     smem[(IN_HEIGHT)][(IN_WIDTH)]
+        for(int irow = wid; irow < IN_HEIGHT; irow += (lsizex * lsizey))
         {
             // clamp to copy the valid border, similarly to copyMakeBorder(BORDER_REPLICATE)
             const int irow_src = clamp(irow, local_point.y, (local_point.y + block_size.y) - 1);
-            for (int icol = 0; icol < (GRP_SIZEX + 4); icol++)
+            for (int icol = 0; icol < IN_WIDTH; icol++)
             {
                 const int icol_src = clamp(icol, local_point.x, (local_point.x + block_size.x) - 1);
 #if cn == 1
-                TYPEN pixel_src = smem_src[iblock_parity][irow_src * (GRP_SIZEX + 4) + icol_src];
-                smem[irow * (GRP_SIZEX + 4) + icol] = CONVERT_TO(short, cn)(pixel_src);
+                TYPEN pixel_src = smem_src[iblock_parity][irow_src * IN_WIDTH + icol_src];
+                smem[irow * IN_WIDTH + icol] = CONVERT_TO(short, cn)(pixel_src);
 #else
-                TYPEN pixel_src = vload3(mad24(irow_src, (GRP_SIZEX + 4), icol_src),
+                TYPEN pixel_src = vload3(mad24(irow_src, IN_WIDTH, icol_src),
                                          (__local TYPE *)(smem_src[iblock_parity]));
                 vstore3(CONVERT_TO(short, cn)(pixel_src),
-                        mad24(irow, (GRP_SIZEX + 4), icol),
+                        mad24(irow, IN_WIDTH, icol),
                         (__local short *)smem);
 #endif
             }
@@ -631,8 +705,19 @@ __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src
         // =========================================================
         // now compute the current block
         // =========================================================
-        stage1_with_sobel_compute_block(start_x, start_y, smem,
-            magx, magy, magz, map_out[iblock_parity], rows, cols, low_thr, high_thr);
+
+#if APRT == 3
+        stage1_singlepass_sobel_compute_block(smem, magx, magy, magz);
+#else
+        stage1_separable_sobel_compute_block(smem, half_dx, half_dy, magx, magy, magz);
+#endif
+
+        // Wait for all magnitudes to be computed. Needed for the first/last
+        // lines for the WIs.
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        stage1_nms_compute_block(magx, magy, magz, map_out[iblock_parity], rows, low_thr, high_thr);
+
 
         // sync to gather output from all WI into map_out[] before putting to global memory
         barrier(CLK_LOCAL_MEM_FENCE);
@@ -671,111 +756,6 @@ __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src
 
 #define loadpix(addr) (__global short *)(addr)
 #define storepix(val, addr) *(__global int *)(addr) = (int)(val)
-
-#ifdef L2GRAD
-#define dist(x, y) ((int)(x) * (x) + (int)(y) * (y))
-#else
-#define dist(x, y) (abs((int)(x)) + abs((int)(y)))
-#endif
-
-__constant int prev[4][2] = {
-    { 0, -1 },
-    { -1, -1 },
-    { -1, 0 },
-    { -1, 1 }
-};
-
-__constant int next[4][2] = {
-    { 0, 1 },
-    { 1, 1 },
-    { 1, 0 },
-    { 1, -1 }
-};
-
-__kernel void stage1_without_sobel(__global const uchar *dxptr, int dx_step, int dx_offset,
-                                   __global const uchar *dyptr, int dy_step, int dy_offset,
-                                   __global uchar *map, int map_step, int map_offset, int rows, int cols,
-                                   int low_thr, int high_thr)
-{
-    int start_x = get_group_id(0) * GRP_SIZEX;
-    int start_y = get_group_id(1) * GRP_SIZEY;
-
-    int lidx = get_local_id(0);
-    int lidy = get_local_id(1);
-
-    __local int mag[(GRP_SIZEX + 2) * (GRP_SIZEY + 2)];
-    __local short2 sigma[(GRP_SIZEX + 2) * (GRP_SIZEY + 2)];
-
-#pragma unroll
-    for (int i = lidx + lidy * GRP_SIZEX; i < (GRP_SIZEX + 2) * (GRP_SIZEY + 2); i += GRP_SIZEX * GRP_SIZEY)
-    {
-        int x = clamp(start_x - 1 + i % (GRP_SIZEX + 2), 0, cols - 1);
-        int y = clamp(start_y - 1 + i / (GRP_SIZEX + 2), 0, rows - 1);
-
-        int dx_index = mad24(y, dx_step, mad24(x, cn * (int)sizeof(short), dx_offset));
-        int dy_index = mad24(y, dy_step, mad24(x, cn * (int)sizeof(short), dy_offset));
-
-        __global short *dx = loadpix(dxptr + dx_index);
-        __global short *dy = loadpix(dyptr + dy_index);
-
-        int mag0 = dist(dx[0], dy[0]);
-#if cn > 1
-        short cdx = dx[0], cdy = dy[0];
-#pragma unroll
-        for (int j = 1; j < cn; ++j)
-        {
-            int mag1 = dist(dx[j], dy[j]);
-            if (mag1 > mag0)
-            {
-                mag0 = mag1;
-                cdx = dx[j];
-                cdy = dy[j];
-            }
-        }
-        dx[0] = cdx;
-        dy[0] = cdy;
-#endif
-        mag[i] = mag0;
-        sigma[i] = (short2)(dx[0], dy[0]);
-    }
-
-    barrier(CLK_LOCAL_MEM_FENCE);
-
-    int gidx = get_global_id(0);
-    int gidy = get_global_id(1);
-
-    if (gidx >= cols || gidy >= rows)
-        return;
-
-    lidx++;
-    lidy++;
-
-    int mag0 = mag[lidx + lidy * (GRP_SIZEX + 2)];
-    short x = (sigma[lidx + lidy * (GRP_SIZEX + 2)]).x;
-    short y = (sigma[lidx + lidy * (GRP_SIZEX + 2)]).y;
-
-    int value = 1;
-    if (mag0 > low_thr)
-    {
-        float x_ = abs(x);
-        float y_ = abs(y);
-
-        int a = (y_ * TG22 >= x_) ? 2 : 1;
-        int b = (y_ * TG67 >= x_) ? 1 : 0;
-
-        int dir3 = (a * b) & (((x ^ y) & 0x80000000) >> 31);
-        int dir = a * b + 2 * dir3;
-        int prev_mag = mag[(lidy + prev[dir][0]) * (GRP_SIZEX + 2) + lidx + prev[dir][1]];
-        int next_mag = mag[(lidy + next[dir][0]) * (GRP_SIZEX + 2) + lidx + next[dir][1]] + (dir & 1);
-
-        if (mag0 > prev_mag && mag0 >= next_mag)
-        {
-            value = (mag0 > high_thr) ? 2 : 0;
-        }
-    }
-
-    map[mad24(gidy, map_step, gidx + map_offset)] = value;
-}
 
 #undef TG22
 #undef CANNY_SHIFT

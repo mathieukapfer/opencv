@@ -177,8 +177,7 @@ static bool ocl_Canny_kalray(InputArray _src, const UMat& dx_, const UMat& dy_, 
     }
     int low = cvFloor(low_thresh), high = cvFloor(high_thresh);
 
-    if (!useCustomDeriv &&
-        aperture_size == 3 && !_src.isSubmatrix())
+    if (!useCustomDeriv && !_src.isSubmatrix())
     {
         /*
             stage1_with_sobel:
@@ -203,13 +202,19 @@ static bool ocl_Canny_kalray(InputArray _src, const UMat& dx_, const UMat& dy_, 
         const int ideal_num_blocks_height = size.height / 8;
 
         // tune blocksize to make sure it fits in __local
-        auto stage1_with_sobel_local_footprint = [cn, &_src](int block_size_x, int block_size_y)
+        auto stage1_with_sobel_local_footprint = [cn, &_src](int block_size_x, int block_size_y, int aperture)
         {
+            int sobel_bufsize;
+            if (aperture == 3)
+                sobel_bufsize = ((block_size_x + 2) * (block_size_y + 2) * 2 * sizeof(short));
+            else
+                sobel_bufsize = ((block_size_x + 2) * (block_size_y + 1 + aperture) * 4 * sizeof(short));
+
             // This formula is developed in canny.cl, and is not the same
             // for every kernels
             return ((block_size_x + 4) * (block_size_y + 4) * 2 * _src.getMat().elemSize()) +
                    ((block_size_x + 4) * (block_size_y + 4) * cn * sizeof(short)) +
-                   ((block_size_x + 2) * (block_size_y + 2) * 2 * sizeof(short)) +
+                   sobel_bufsize +
                    ((block_size_x + 2) * (block_size_y + 2) * 1 * sizeof(int)) +
                    (block_size_x * block_size_y * 2 * sizeof(unsigned char));
         };
@@ -218,7 +223,7 @@ static bool ocl_Canny_kalray(InputArray _src, const UMat& dx_, const UMat& dy_, 
         int max_block_size = std::min(ideal_num_blocks_width, ideal_num_blocks_height);
 
         // if blocksize too big, reduce it gradually
-        while (stage1_with_sobel_local_footprint(max_block_size, max_block_size) > max_local_mem_size)
+        while (stage1_with_sobel_local_footprint(max_block_size, max_block_size, aperture_size) > max_local_mem_size)
         {
             max_block_size -= 16;
         }
@@ -241,12 +246,13 @@ static bool ocl_Canny_kalray(InputArray _src, const UMat& dx_, const UMat& dy_, 
         globalsize[1] = localsize[1];
 
         ocl::Kernel with_sobel("stage1_with_sobel", used_canny_oclsrc,
-                               format("-D WITH_SOBEL -D cn=%d -D TYPE=%s -D convert_floatN=%s -D floatN=%s -D GRP_SIZEX=%d -D GRP_SIZEY=%d%s -D shortN=%s -D intN=%s",
+                               format("-D WITH_SOBEL -D cn=%d -D TYPE=%s -D convert_floatN=%s -D floatN=%s -D GRP_SIZEX=%d -D GRP_SIZEY=%d%s -D APRT=%i -D shortN=%s -D intN=%s",
                                       cn, ocl::memopTypeToStr(_src.depth()),
                                       ocl::convertTypeStr(_src.depth(), CV_32F, cn, cvt),
                                       ocl::typeToStr(CV_MAKE_TYPE(CV_32F, cn)),
                                       grp_sizex, grp_sizey,
                                       L2gradient ? " -D L2GRAD" : "",
+                                      aperture_size,
                                       ocl::typeToStr(CV_MAKE_TYPE(CV_16S, cn)),
                                       ocl::typeToStr(CV_MAKE_TYPE(CV_32S, cn))));
         if (with_sobel.empty())
