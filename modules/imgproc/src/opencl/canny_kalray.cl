@@ -318,6 +318,7 @@ inline void sobel_sep_row(int in_idx, int out_idx, __local const shortN *smem, _
 {
     short sum_x = 0, sum_y = 0;
     int start_x = in_idx - (APRT>>1);
+    #pragma unroll
     for (int i=0; i<APRT; i++)
     {
         sum_x += smem[start_x + i] * kx[i];
@@ -330,6 +331,7 @@ inline void sobel_sep_row(int in_idx, int out_idx, __local const shortN *smem, _
 inline void sobel_sep_col(int idx, __local const short *half_d, __local short *d, const short *k)
 {
     short sum = 0;
+    #pragma unroll
     for (int i=0; i<APRT; i++)
     {
         sum += half_d[MAG_OFFSET_Y(idx, i)] * k[i];
@@ -355,11 +357,19 @@ static inline void stage1_separable_sobel_compute_block(
     // TODO generate kernel
     const short kx_x[5] = {-1,-2,0,2,1};
     const short ky[5] = {1,4,6,4,1};
+
     for (int y = start_in_row; y < end_in_row; y++) {
         int out_idx = MAG_OFFSET_Y(0, y);
         int in_idx = IN_OFFSET_Y(APRT>>1, y);
-        for(int x=0;x<MAG_WIDTH;x++)
-        {
+        for(int x=0;x<MAG_WIDTH/16;x++) {
+            #pragma unroll
+            for (int iter = 0; iter < 16; iter++) {
+                sobel_sep_row(in_idx, out_idx, smem, half_dx, half_dy, kx_x, ky);
+                in_idx++;
+                out_idx++;
+            }
+        }
+        for(int x=0;x<MAG_WIDTH%16;x++) {
             sobel_sep_row(in_idx, out_idx, smem, half_dx, half_dy, kx_x, ky);
             in_idx++;
             out_idx++;
@@ -376,8 +386,16 @@ static inline void stage1_separable_sobel_compute_block(
     // Which one maximize cache hit ? (probably depends on aperture size)
     for (int y = start_mag_row; y < end_mag_row; y++) {
         int idx = MAG_OFFSET_Y(0, y);
-        for(int x=0;x<MAG_WIDTH;x++)
-        {
+        for(int x=0;x<MAG_WIDTH/8;x++) {
+            #pragma unroll
+            for (int iter = 0; iter < 8; iter++) {
+                sobel_sep_col(idx, half_dx, dx, ky);
+                sobel_sep_col(idx, half_dy, dy, kx_y);
+                magz[idx] = dist(dx[idx], dy[idx]);
+                idx++;
+            }
+        }
+        for(int x=0;x<MAG_WIDTH%8;x++) {
             sobel_sep_col(idx, half_dx, dx, ky);
             sobel_sep_col(idx, half_dy, dy, kx_y);
             magz[idx] = dist(dx[idx], dy[idx]);
