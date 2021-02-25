@@ -28,3 +28,7 @@ SET(OPENCL_LIBRARY            "$ENV{KALRAY_TOOLCHAIN_DIR}/lib/libOpenCL.so" CACH
 
 # Generate .pc
 SET(OPENCV_GENERATE_PKGCONFIG ON  CACHE BOOL "Generate .pc file for pkg-config build tool")
+
+# Not supported modules
+SET(BUILD_opencv_dnn          OFF CACHE BOOL "Build DNN module")
+SET(BUILD_opencv_ml           OFF CACHE BOOL "Build ML module")
