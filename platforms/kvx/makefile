@@ -128,8 +128,7 @@ ENABLE_GPU=	\
 
 ENABLE_MPPA_IN_SPMD_MODE= \
 	OPENCV_OPENCL_DEVICE=':ACCELERATOR:' \
-	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16 \
-  POCL_MPPA_EXTRA_BUILD_CFLAGS=$(POCL_MPPA_EXTRA_BUILD_CFLAGS) \
+	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16
 
 # ======================================================================================
 # targets to list available test a perf
