@@ -212,13 +212,17 @@ static bool ocl_Canny_kalray(InputArray _src, const UMat& dx_, const UMat& dy_, 
         {
             int sobel_bufsize;
             if (aperture == 3)
+            {
                 sobel_bufsize = ((block_size_x + 2) * (block_size_y + 2) * 2 * sizeof(short));
+            }
             else
+            {
                 sobel_bufsize = ((block_size_x + 2) * (block_size_y + 1 + aperture) * 4 * sizeof(short));
+            }
 
             // This formula is developed in canny.cl, and is not the same
             // for every kernels
-            return ((block_size_x + 4) * (block_size_y + 4) * 2 * _src.getMat().elemSize()) +
+            return ((block_size_x + 4) * (block_size_y + 4) * 2 * _src.getUMat().elemSize()) +
                    ((block_size_x + 4) * (block_size_y + 4) * cn * sizeof(short)) +
                    sobel_bufsize +
                    ((block_size_x + 2) * (block_size_y + 2) * 1 * sizeof(int)) +
