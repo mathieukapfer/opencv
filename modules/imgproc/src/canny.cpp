@@ -178,12 +178,12 @@ static bool ocl_Canny_kalray(InputArray _src, const UMat& dx_, const UMat& dy_, 
     }
     int low = cvFloor(low_thresh), high = cvFloor(high_thresh);
 
-    if (!useCustomDeriv &&
-        // the kalray kernel 'stage1_with_sobel' handle the both version:
-        ( (aperture_size == 3) || // using sobel single path 3x3 filter
-          (aperture_size == 5)    // using sobel derivative (5 ROWS and 5 COLS filters)
-          ) &&
-        !_src.isSubmatrix() )
+    // the Kalray kernel 'stage1_with_sobel' handle both versions :
+    // - Sobel single pass for 3x3 filter
+    // - Sobel separable for 5x5 (currently only support one channel images)
+    if (!useCustomDeriv
+        && ((aperture_size == 3) || (aperture_size == 5 && cn == 1))
+        && !_src.isSubmatrix())
     {
         /*
             stage1_with_sobel:

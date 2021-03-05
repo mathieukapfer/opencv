@@ -316,6 +316,8 @@ static inline void stage1_singlepass_sobel_compute_block(
 
 inline void sobel_sep_row(int in_idx, int out_idx, __local const shortN *smem, __local short *half_dx,__local short *half_dy, const short *kx, const short *ky)
 {
+// cn==3 not supported
+#if cn == 1
     short sum_x = 0, sum_y = 0;
     int start_x = in_idx - (APRT>>1);
     #pragma unroll
@@ -326,6 +328,7 @@ inline void sobel_sep_row(int in_idx, int out_idx, __local const shortN *smem, _
     }
     half_dx[out_idx] = sum_x;
     half_dy[out_idx] = sum_y;
+#endif
 }
 
 inline void sobel_sep_col(int idx, __local const short *half_d, __local short *d, const short *k)
@@ -774,6 +777,111 @@ __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src
 
 #define loadpix(addr) (__global short *)(addr)
 #define storepix(val, addr) *(__global int *)(addr) = (int)(val)
+
+#ifdef L2GRAD
+#define dist(x, y) ((int)(x) * (x) + (int)(y) * (y))
+#else
+#define dist(x, y) (abs((int)(x)) + abs((int)(y)))
+#endif
+
+__constant int prev[4][2] = {
+    { 0, -1 },
+    { -1, -1 },
+    { -1, 0 },
+    { -1, 1 }
+};
+
+__constant int next[4][2] = {
+    { 0, 1 },
+    { 1, 1 },
+    { 1, 0 },
+    { 1, -1 }
+};
+
+__kernel void stage1_without_sobel(__global const uchar *dxptr, int dx_step, int dx_offset,
+                                   __global const uchar *dyptr, int dy_step, int dy_offset,
+                                   __global uchar *map, int map_step, int map_offset, int rows, int cols,
+                                   int low_thr, int high_thr)
+{
+    int start_x = get_group_id(0) * GRP_SIZEX;
+    int start_y = get_group_id(1) * GRP_SIZEY;
+
+    int lidx = get_local_id(0);
+    int lidy = get_local_id(1);
+
+    __local int mag[(GRP_SIZEX + 2) * (GRP_SIZEY + 2)];
+    __local short2 sigma[(GRP_SIZEX + 2) * (GRP_SIZEY + 2)];
+
+#pragma unroll
+    for (int i = lidx + lidy * GRP_SIZEX; i < (GRP_SIZEX + 2) * (GRP_SIZEY + 2); i += GRP_SIZEX * GRP_SIZEY)
+    {
+        int x = clamp(start_x - 1 + i % (GRP_SIZEX + 2), 0, cols - 1);
+        int y = clamp(start_y - 1 + i / (GRP_SIZEX + 2), 0, rows - 1);
+
+        int dx_index = mad24(y, dx_step, mad24(x, cn * (int)sizeof(short), dx_offset));
+        int dy_index = mad24(y, dy_step, mad24(x, cn * (int)sizeof(short), dy_offset));
+
+        __global short *dx = loadpix(dxptr + dx_index);
+        __global short *dy = loadpix(dyptr + dy_index);
+
+        int mag0 = dist(dx[0], dy[0]);
+#if cn > 1
+        short cdx = dx[0], cdy = dy[0];
+#pragma unroll
+        for (int j = 1; j < cn; ++j)
+        {
+            int mag1 = dist(dx[j], dy[j]);
+            if (mag1 > mag0)
+            {
+                mag0 = mag1;
+                cdx = dx[j];
+                cdy = dy[j];
+            }
+        }
+        dx[0] = cdx;
+        dy[0] = cdy;
+#endif
+        mag[i] = mag0;
+        sigma[i] = (short2)(dx[0], dy[0]);
+    }
+
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    int gidx = get_global_id(0);
+    int gidy = get_global_id(1);
+
+    if (gidx >= cols || gidy >= rows)
+        return;
+
+    lidx++;
+    lidy++;
+
+    int mag0 = mag[lidx + lidy * (GRP_SIZEX + 2)];
+    short x = (sigma[lidx + lidy * (GRP_SIZEX + 2)]).x;
+    short y = (sigma[lidx + lidy * (GRP_SIZEX + 2)]).y;
+
+    int value = 1;
+    if (mag0 > low_thr)
+    {
+        float x_ = abs(x);
+        float y_ = abs(y);
+
+        int a = (y_ * TG22 >= x_) ? 2 : 1;
+        int b = (y_ * TG67 >= x_) ? 1 : 0;
+
+        int dir3 = (a * b) & (((x ^ y) & 0x80000000) >> 31);
+        int dir = a * b + 2 * dir3;
+        int prev_mag = mag[(lidy + prev[dir][0]) * (GRP_SIZEX + 2) + lidx + prev[dir][1]];
+        int next_mag = mag[(lidy + next[dir][0]) * (GRP_SIZEX + 2) + lidx + next[dir][1]] + (dir & 1);
+
+        if (mag0 > prev_mag && mag0 >= next_mag)
+        {
+            value = (mag0 > high_thr) ? 2 : 0;
+        }
+    }
+
+    map[mad24(gidy, map_step, gidx + map_offset)] = value;
+}
 
 #undef TG22
 #undef CANNY_SHIFT
