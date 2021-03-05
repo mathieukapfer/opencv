@@ -190,8 +190,10 @@ IMPLEMENT_ASYNC_COPY_2D2D_FUNCS(float, "%.3f");
 
 #ifdef L2GRAD
 #define dist(x, y) ((int)(x) * (x) + (int)(y) * (y))
+#define distn(x, y) (convert_int4(x) * convert_int4(x) + convert_int4(y) * convert_int4(y))
 #else
 #define dist(x, y) (abs((int)(x)) + abs((int)(y)))
+#define distn(x, y) convert_int4(abs(x) + abs(y))
 #endif
 
 /*
@@ -331,17 +333,6 @@ inline void sobel_sep_row(int in_idx, int out_idx, __local const shortN *smem, _
 #endif
 }
 
-inline void sobel_sep_col(int idx, __local const short *half_d, __local short *d, const short *k)
-{
-    short sum = 0;
-    #pragma unroll
-    for (int i=0; i<APRT; i++)
-    {
-        sum += half_d[MAG_OFFSET_Y(idx, i)] * k[i];
-    }
-    d[idx] = sum;
-}
-
 static inline void stage1_separable_sobel_compute_block(
     __local shortN *smem,
     __local short *half_dx,
@@ -388,20 +379,34 @@ static inline void stage1_separable_sobel_compute_block(
     // TODO compare horizontal versus vertical iteration for vertical filtering.
     // Which one maximize cache hit ? (probably depends on aperture size)
     for (int y = start_mag_row; y < end_mag_row; y++) {
-        int idx = MAG_OFFSET_Y(0, y);
-        for(int x=0;x<MAG_WIDTH/8;x++) {
+        for(int x=0;x<MAG_WIDTH/4;x++) {
+            int row_offset = MAG_OFFSET_Y(0, y);
+            short4 sum_x = vload4(x, &(half_dx[row_offset])) * ky[0];
+            short4 sum_y = vload4(x, &(half_dy[row_offset])) * kx_y[0];
             #pragma unroll
-            for (int iter = 0; iter < 8; iter++) {
-                sobel_sep_col(idx, half_dx, dx, ky);
-                sobel_sep_col(idx, half_dy, dy, kx_y);
-                magz[idx] = dist(dx[idx], dy[idx]);
-                idx++;
+            for (int i=1; i<APRT; i++)
+            {
+                sum_x += vload4(x, &(half_dx[MAG_OFFSET_Y(0, y+i)])) * ky[i];
+                sum_y += vload4(x, &(half_dy[MAG_OFFSET_Y(0, y+i)])) * kx_y[i];
             }
+            vstore4(sum_x, x, &(dx[row_offset]));
+            vstore4(sum_y, x, &(dy[row_offset]));
+            vstore4(distn(sum_x, sum_y), x, &(magz[row_offset]));
         }
-        for(int x=0;x<MAG_WIDTH%8;x++) {
-            sobel_sep_col(idx, half_dx, dx, ky);
-            sobel_sep_col(idx, half_dy, dy, kx_y);
-            magz[idx] = dist(dx[idx], dy[idx]);
+        int idx = MAG_WIDTH - (MAG_WIDTH % 4);
+        for(int x=0;x<MAG_WIDTH%4;x++) {
+            int offset = MAG_OFFSET_Y(idx, y);
+            short sum_x = half_dx[offset] * ky[0];
+            short sum_y = half_dy[offset] * kx_y[0];
+            #pragma unroll
+            for (int i=1; i<APRT; i++)
+            {
+                sum_x += half_dx[MAG_OFFSET_Y(idx, y+i)] * ky[i];
+                sum_y += half_dy[MAG_OFFSET_Y(idx, y+i)] * kx_y[i];
+            }
+            dx[offset] = sum_x;
+            dy[offset] = sum_y;
+            magz[offset] = dist(sum_x, sum_y);
             idx++;
         }
     }
