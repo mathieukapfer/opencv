@@ -62,6 +62,10 @@ static String getDeviceTypeString(const cv::ocl::Device& device)
         }
     }
 
+    if (device.type() == cv::ocl::Device::TYPE_ACCELERATOR) {
+        return "ACCELERATOR";
+    }
+
     return "unknown";
 }
 } // namespace
