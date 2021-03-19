@@ -298,9 +298,129 @@ struct cmp_pt
     bool operator ()(const pt& a, const pt& b) const { return a.y < b.y || (a.y == b.y && a.x < b.x); }
 };
 
+static bool ocl_FAST_kalray( InputArray _img, std::vector<KeyPoint>& keypoints,
+                     int threshold, bool nonmax_suppression, int maxKeypoints )
+{
+    // OpenCL kernel source used
+    struct cv::ocl::internal::ProgramEntry used_fast_oclsrc = ocl::features2d::fast_kalray_oclsrc;
+
+    // If maxKeypoints is set to 0, we should not report any keypoint.
+    if (maxKeypoints == 0)
+        return true;
+
+    // The FAST algorith requires a 7x7 mat to check if pixel p is a keypoint
+    UMat img = _img.getUMat();
+    if (img.cols < 7 || img.rows < 7)
+        return false;
+
+    const ocl::Device &dev = ocl::Device::getDefault();
+
+    // Maximal __local mem size, with 8KB less for margin (alignment, metadata)
+    const size_t max_local_mem_size = dev.maxLocalMemSize() - 8*1024;
+
+    const int ideal_num_blocks_width = img.cols / 8;
+    const int ideal_num_blocks_height = img.rows / 8;
+
+    // Let's start with the ideal blocksize
+    int max_block_size = std::min(ideal_num_blocks_width, ideal_num_blocks_height);
+
+    // If blocksize too big, reduce it gradually
+    while ((max_block_size * max_block_size * 2 * img.elemSize()) > max_local_mem_size)
+    {
+        max_block_size -= 16;
+    }
+
+    int grp_sizex = max_block_size;
+    int grp_sizey = max_block_size;
+
+    size_t localsize[] = { dev.maxWorkGroupSize(), 1 };
+    size_t globalsize[] = { localsize[0] * dev.maxComputeUnits(), localsize[1] };
+
+    // Kernel setup
+    ocl::Kernel fastKptKernel("FAST_findKeypoints", used_fast_oclsrc,
+                              format("-D GRP_SIZEX=%d -D GRP_SIZEY=%d", grp_sizex, grp_sizey));
+    if (fastKptKernel.empty())
+        return false;
+
+    UMat kp1(1, maxKeypoints*2+1, CV_32S, Scalar(0));
+
+    UMat ucounter1(kp1, Rect(0,0,1,1));
+    ucounter1.setTo(Scalar::all(0));
+
+    if (!fastKptKernel.args(ocl::KernelArg::ReadOnly(img),
+                            ocl::KernelArg::PtrReadWrite(kp1),
+                            maxKeypoints, threshold).run(2, globalsize, localsize, true))
+        return false;
+
+    Mat mcounter;
+    ucounter1.copyTo(mcounter);
+    int i, counter = mcounter.at<int>(0);
+    counter = std::min(counter, maxKeypoints);
+
+    keypoints.clear();
+
+    if (counter == 0)
+        return true;
+
+    // Return keypoint vector or compute NMS
+    if (!nonmax_suppression)
+    {
+        Mat m;
+        kp1(Rect(0, 0, counter*2+1, 1)).copyTo(m);
+        const Point* pt = (const Point*)(m.ptr<int>() + 1);
+        for( i = 0; i < counter; i++ ) {
+            // Reconstruct the vector.
+            // We take advantage of this operation to remove the 0 padding.
+            float x = (float)pt[i].x;
+            float y = (float)pt[i].y;
+            if (x != 0 && y != 0) {
+                keypoints.push_back(KeyPoint(x, y, 7.f, -1, 1.f));
+            }
+        }
+    }
+    else
+    {
+        UMat kp2(1, maxKeypoints*3+1, CV_32S);
+        UMat ucounter2 = kp2(Rect(0,0,1,1));
+        ucounter2.setTo(Scalar::all(0));
+
+        ocl::Kernel fastNMSKernel("FAST_nonmaxSupression", used_fast_oclsrc,
+                                  format("-D GRP_SIZEX=%d -D GRP_SIZEY=%d", grp_sizex, grp_sizey));
+        if (fastNMSKernel.empty())
+            return false;
+
+        size_t globalsize_nms[] = { (size_t)counter };
+        if( !fastNMSKernel.args(ocl::KernelArg::PtrReadOnly(kp1),
+                                ocl::KernelArg::PtrReadWrite(kp2),
+                                ocl::KernelArg::ReadOnly(img),
+                                counter, counter).run(1, globalsize_nms, 0, true))
+            return false;
+
+        Mat m2;
+        kp2(Rect(0, 0, counter*3+1, 1)).copyTo(m2);
+        Point3i* pt2 = (Point3i*)(m2.ptr<int>() + 1);
+        int newcounter = std::min(m2.at<int>(0), counter);
+
+        std::sort(pt2, pt2 + newcounter, cmp_pt<Point3i>());
+
+        for (i = 0; i < newcounter; i++)
+            keypoints.push_back(KeyPoint((float)pt2[i].x, (float)pt2[i].y, 7.f, -1, (float)pt2[i].z));
+    }
+
+    return true;
+}
+
 static bool ocl_FAST( InputArray _img, std::vector<KeyPoint>& keypoints,
                      int threshold, bool nonmax_suppression, int maxKeypoints )
 {
+    const ocl::Device &dev = ocl::Device::getDefault();
+
+    // If Kalray device, use custom Kalray function
+    if (dev.isKalray())
+    {
+        return ocl_FAST_kalray(_img, keypoints, threshold, nonmax_suppression, maxKeypoints);
+    }
+
     UMat img = _img.getUMat();
     if( img.cols < 7 || img.rows < 7 )
         return false;
