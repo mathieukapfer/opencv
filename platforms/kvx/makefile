@@ -41,6 +41,7 @@ help:
 	@echo "      make run_mppa_bench       : execute all bench"
 	@echo "      make run_canny_perf_mppa  : execute canny bench on mppa"
 	@echo "      make run_canny_test_mppa  : execute canny test on mppa"
+	@echo "      make run_fast_perf_mppa   : execute fast bench on mppa"
 	@echo
 	@echo
 	@echo "    Opencv test & bench:"
@@ -248,6 +249,9 @@ build_perf_canny:
 build_test_canny:
 	cd build && make -j`nproc` opencv_test_imgproc
 
+build_perf_fast:
+	cd build && make -j`nproc` opencv_perf_features2d
+
 # CI target
 # ======================================================================================
 
@@ -306,4 +310,29 @@ _run_canny_perf_mppa:
   ${ENABLE_MPPA_IN_SPMD_MODE} \
 	${TIME} ${VALGRING} opencv_perf_imgproc --perf_force_samples=$(FORCE_SAMPLE) \
 	--gtest_filter="*CL_CannyFixture_Canny.Canny/*" 2>&1 | tee $@.log
+	OUTPUT=$@ make _canny_perf_parser
+
+
+# FAST kernels
+# ======================================================================================
+
+# wrapper
+run_fast_perf_mppa: build_perf_fast _run_fast_perf_mppa
+
+# create a list of OpenCL tests for the FAST algorithm
+FAST_TEST_LIST=$(foreach num, 0 1 2 9 10 11 18 19 20,*OCL_feature2d_detect.detect/$(num):)
+empty:=
+space:= $(empty) $(empty)
+
+# target without dependancies (for CI)
+_run_fast_perf_mppa:
+	@echo
+	@echo
+	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16 \
+	POCL_DEBUG=$(POCL_DEBUG) \
+	POCL_TRACING=cq \
+	${COMMUN_ENV} \
+  ${ENABLE_MPPA_IN_SPMD_MODE} \
+	${TIME} ${VALGRING} opencv_perf_features2d --perf_force_samples=$(FORCE_SAMPLE) \
+	--gtest_filter="$(subst $(space),,$(FAST_TEST_LIST))" 2>&1 | tee $@.log
 	OUTPUT=$@ make _canny_perf_parser
