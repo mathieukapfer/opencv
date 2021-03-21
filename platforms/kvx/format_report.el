@@ -48,6 +48,7 @@
         (search-forward-regexp kernel-timing-regexp nil t)
         (setq kernel-timing (match-string 1))
         (setq kernel-timing-unity (match-string 2))
+        (replace-match "xxx" )
         (princ (format "\t%s:\t%s\t%s" kernel-name kernel-timing kernel-timing-unity) output)
         )
        )
