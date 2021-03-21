@@ -14,7 +14,8 @@
 
 (setq test-name-regexp (concat "RUN.*" "\\(" "OCL" name-with-point-regexp "/" num-regexp "\\)") )
 (setq kernel-name-regexp (concat "clEnqueueNDRangeKernel('" "\\("  name-regexp "\\)" "'" ))
-(setq kernel-timing-regexp (concat "TIMING |" sep ">>>" sep "\\(" num-regexp "\\)" sep "\\(" ".s" "\\)" ))
+(setq kernel-timing-regexp (concat "TIMING |" ))
+(setq kernel-timing-regexp-next (concat ">>>" sep "\\(" num-regexp "\\)" sep "\\(" ".s" "\\)" ))
 
 
 (defun my-format-perf-report(&optional file-to-parse)
@@ -46,8 +47,10 @@
         ;; parse kernel properties
         (setq kernel-name (match-string 1))
         (search-forward-regexp kernel-timing-regexp nil t)
+        (search-forward-regexp kernel-timing-regexp-next nil t)
         (setq kernel-timing (match-string 1))
         (setq kernel-timing-unity (match-string 2))
+        (replace-match "xxx" )
         (princ (format "\t%s:\t%s\t%s" kernel-name kernel-timing kernel-timing-unity) output)
         )
        )
