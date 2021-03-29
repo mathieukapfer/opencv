@@ -38,12 +38,12 @@ help:
 # configure
 # ----------
 configure:
-	mkdir -p build && cd build && OpenCV_DIR=$(OpenCV_DIR)  cmake ..
+	mkdir -p build && cd build && OpenCV_DIR=$(OpenCV_DIR) cmake -DCMAKE_BUILD_TYPE=Debug ..
 
 # build
 # ----------
 compile:
-	cd build && make
+	cd build && make -j 6
 
 # cleann
 # ----------
@@ -79,6 +79,8 @@ RUN_ENV_MPPA= \
 
 RUN_ENV_GPU= \
 	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16 \
+  OPENCV_OPENCL_DEVICE=':GPU:' \
+	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=256 \
 
 RUN_ENV=$(RUN_ENV_MPPA)
 
@@ -122,7 +124,7 @@ opencl-opencv-interop:
 
 ## dependencies
 opencv_imgproc:
-	cd ../build/modules/imgproc/ && make $@
+	cd ../build/modules/imgproc/ && make -j 6 $@
 
 # parser
 parser-with-timing:
