@@ -1060,10 +1060,12 @@ void Canny( InputArray _src, OutputArray _dst,
 {
     CV_INSTRUMENT_REGION();
 
+    #if 0
     std::cout << __FILE__ << ":" << __LINE__ << ":" << __FUNCTION__ << " called with "
       "src size: " << _src.size() << "dst size: " << _dst.size() <<
       ", low_thresh: " << low_thresh << ", high_thresh: " << high_thresh <<
       ", aperture_size: " << aperture_size << ", L2gradient: " << L2gradient << std::endl;
+    #endif
 
     CV_Assert( _src.depth() == CV_8U );
 
