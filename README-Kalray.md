@@ -29,4 +29,5 @@
        $ make compile
        $ make opencl-opencv-interop
        $ make opencl_custom_kernel
+       $ make opencl_fast_kernel
        $ make transparent_api

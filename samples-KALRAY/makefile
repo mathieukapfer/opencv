@@ -35,6 +35,7 @@ help:
 	@echo " list of <prg>: "
 	@echo "  transparent_api:        a demo code of tapi that use BRD2GARY, gaussian, canny "
 	@echo "  opencl_custom_kernel:   a demo to work on custom kernel (from opencv)"
+	@echo "  opencl_fast_kernel:     a demo to work on fast kernel (from opencv)"
 	@echo "  opencl-opencv-interop:  a demo to work on both opencl & opencv (from opencv)"
 	@echo
 
@@ -116,6 +117,12 @@ transparent_api: opencv_imgproc build/$@
 	OUTPUT=$@ make parser-with-timing
 
 opencl_custom_kernel:
+	cd build && make $@
+	$(RUN_ENV) \
+	./build/$@ 2>&1 | tee $@.log
+	OUTPUT=$@ make parser-with-timing
+
+opencl_fast_kernel:
 	cd build && make $@
 	$(RUN_ENV) \
 	./build/$@ 2>&1 | tee $@.log
