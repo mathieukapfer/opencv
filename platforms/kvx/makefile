@@ -1,6 +1,7 @@
 PWD=$(shell pwd)
 
 POCL_CACHE_DIR=$(PWD)/.cache/pocl
+OPENCV_OPENCL_CACHE_DIR=$(PWD)/.cache
 
 MSG_CHECK_ENV_TOOCHAIN= $(if $(KALRAY_TOOLCHAIN_DIR), \
 	"$(KALRAY_TOOLCHAIN_DIR)", \
@@ -35,7 +36,14 @@ help:
 	@echo
 	@echo " Then, build and run "
 	@echo
-	@echo "    Functional and Perf test: "
+	@echo "    Subset of test & bench for mppa optimized kernels"
+	@echo
+	@echo "      make run_mppa_bench       : execute all bench"
+	@echo "      make run_canny_perf_mppa  : execute canny bench on mppa"
+	@echo "      make run_canny_test_mppa  : execute canny test on mppa"
+	@echo
+	@echo
+	@echo "    Opencv test & bench:"
 	@echo
 	@echo "      make test_list            : list of binaries "
 	@echo "      make run_gpu_<binary>     : execute test on gpu"
@@ -44,15 +52,14 @@ help:
 	@echo "      NOTE: <binary> : is the name of binary without 'opencv-' prefix"
 	@echo "            <binary> : 'all_test' to execute the full test suite"
 	@echo "            <binary> : 'all_perf' to execute the full perf suite"
-	@echo
-	@echo "    Special target"
-	@echo "      make canny_perf_mppa      : execute canny test bench on mppa"
-	@echo
 
 
 # install dependencies
 install-dep:
-	sudo apt install libavcodec-dev libavformat-dev libavresample-dev libavutil-dev libgstreamer-plugins-base1.0-dev libgstreamer1.0-dev libgstreamermm-1.0-dev libgtk2.0-dev emacs
+	@echo
+	@echo " Just copy & past this command:"
+	@echo
+	@echo "   sudo apt install libavcodec-dev libavformat-dev libavresample-dev libavutil-dev libgstreamer-plugins-base1.0-dev libgstreamer1.0-dev libgstreamermm-1.0-dev libgtk2.0-dev emacs"
 
 # clean
 clean:
@@ -65,7 +72,7 @@ clean-pocl-cache:
 	rm -rf $(POCL_CACHE_DIR)
 
 clean-pocl-cache-opencv:
-	rm -rf $(HOME)/.cache/opencv
+	rm -rf $(OPENCV_OPENCL_CACHE_DIR)
 
 # configure
 opencv_prefix=install
@@ -76,7 +83,7 @@ opencv_test_bin_path=install
 #  - to enable opencl , we must have this
 # 		OPENCL_FOUND                     ON
 # 		WITH_OPENCL                      ON
-#  - to build & run exampme, we must have this
+#  - to build & run example, we must have this
 # 		BUILD_EXAMPLES                   ON
 # 		BUILD_PERF_TESTS                 ON
 # 		INSTALL_BIN_EXAMPLES             ON
@@ -119,6 +126,7 @@ COMMUN_ENV=	\
   LD_LIBRARY_PATH=$(LD_LIBRARY_PATH):$(PWD)/build/lib \
 	OPENCV_TEST_DATA_PATH=$(OPENCV_TEST_DATA_PATH) \
 	POCL_CACHE_DIR=$(POCL_CACHE_DIR) \
+  OPENCV_OPENCL_CACHE_DIR=$(OPENCV_OPENCL_CACHE_DIR)
 
 ENABLE_MPPA_DEFAULT_MODE=	\
 	OPENCV_OPENCL_DEVICE=':ACCELERATOR:'
@@ -218,7 +226,7 @@ run_mppa_%: build/bin/opencv_%
 	--gtest_filter="*CL*"
 
 # ======================================================================================
-# Specific target for canny
+# Specific kalray
 # ======================================================================================
 
 # enable POCL trace
@@ -232,18 +240,37 @@ POCL_DEBUG=timing
 #VALGRING=valgrind
 #TIME=time
 
+# Global target
+# ======================================================================================
 build_perf_canny:
-		cd build && make opencv_perf_imgproc
+	cd build && make -j`nproc` opencv_perf_imgproc
 
-parser-with-timing:
-	emacs --batch --load $(PWD)/platforms/kvx/format_report.el --eval "(my-format-perf-report \"$(OUTPUT).log\")" | tee $(OUTPUT)_parsed.log
-	@echo
-	@echo "================================================================================="
-	@echo
-	@echo "Only with sobel:"
-	cat $(OUTPUT)_parsed.log | grep stage1_with_sobel | column -t
+build_test_canny:
+	cd build && make -j`nproc` opencv_test_imgproc
 
-canny_perf_gpu: build_perf_canny
+# CI target
+# ======================================================================================
+
+KALRAY_BENCH_OUTPUT:=kalray_bench_output.log
+
+# run only target without build dependencies (for CI)
+run_mppa_bench:
+	-rm $(KALRAY_BENCH_OUTPUT)
+	make FORCE_SAMPLE=10 _run_canny_perf_mppa
+
+# Canny kernels
+# ======================================================================================
+
+_canny_perf_parser:
+	@emacs --batch --no-init-file --load $(PWD)/platforms/kvx/format_report.el --eval "(my-format-perf-report \"$(OUTPUT).log\")" >  $(OUTPUT)_parsed.log
+	@if [ $(FORCE_SAMPLE) -gt 1 ]; then \
+		cat $(OUTPUT)_parsed.log | sed  "s/stage1/\n\tstage1/g" | tee $(KALRAY_BENCH_OUTPUT); \
+	else \
+		cat $(OUTPUT)_parsed.log | tee $(KALRAY_BENCH_OUTPUT); \
+	fi
+	@echo
+
+run_canny_perf_gpu: build_perf_canny
 	@echo
 	@echo
 	POCL_DEBUG=$(POCL_DEBUG) \
@@ -252,15 +279,31 @@ canny_perf_gpu: build_perf_canny
   ${ENABLE_GPU} \
 	${TIME} ${VALGRING} opencv_perf_imgproc --perf_force_samples=$(FORCE_SAMPLE) \
 	--gtest_filter="*CL_CannyFixture_Canny.Canny*"  2>&1 | tee $@.log
-	OUTPUT=$@ make parser-with-timing
+	OUTPUT=$@ make _canny_perf_parser
 
-canny_perf_mppa: build_perf_canny
+# target with build dependencies (for development mode)
+run_canny_test_mppa: build_test_canny
 	@echo
 	@echo
 	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16 \
 	POCL_DEBUG=$(POCL_DEBUG) \
 	${COMMUN_ENV} \
+	${ENABLE_MPPA_IN_SPMD_MODE} \
+	${TIME} opencv_test_imgproc \
+	--gtest_filter="*OCL_ImgProc/Canny.Accuracy/*"
+
+# wrapper
+run_canny_perf_mppa: build_perf_canny _run_canny_perf_mppa
+
+# target without dependancies (for CI)
+_run_canny_perf_mppa:
+	@echo
+	@echo
+	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16 \
+	POCL_DEBUG=$(POCL_DEBUG) \
+	POCL_TRACING=cq \
+	${COMMUN_ENV} \
   ${ENABLE_MPPA_IN_SPMD_MODE} \
 	${TIME} ${VALGRING} opencv_perf_imgproc --perf_force_samples=$(FORCE_SAMPLE) \
 	--gtest_filter="*CL_CannyFixture_Canny.Canny/*" 2>&1 | tee $@.log
-	OUTPUT=$@ make parser-with-timing
+	OUTPUT=$@ make _canny_perf_parser
