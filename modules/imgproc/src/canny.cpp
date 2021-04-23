@@ -213,16 +213,21 @@ static bool ocl_Canny_kalray(InputArray _src, const UMat& dx_, const UMat& dy_, 
             // TYPE3 is actually TYPE4, with the 4th element being padding.
             int cn_size = cn == 3 ? 4 : cn;
 
+            // get image size while avoiding useless transfer (keep same type as src)
+            const size_t src_elemsize = _src.isMat() ? _src.getMat().elemSize() : _src.getUMat().elemSize();
             int sobel_bufsize;
             if (aperture == 3)
+            {
                 sobel_bufsize = ((block_size_x + 2) * (block_size_y + 2) * 2 * sizeof(short));
+            }
             else
+            {
                 sobel_bufsize = ((block_size_x + 2) * (block_size_y + 1 + aperture) * 4 * sizeof(short));
+            }
 
             // This formula is developed in canny.cl, and is not the same
             // for every kernels
-
-            return ((block_size_x + 4) * (block_size_y + 4) * 2 * _src.getMat().elemSize()) +
+            return ((block_size_x + 4) * (block_size_y + 4) * 2 *  src_elemsize) +
                    ((block_size_x + 4) * (block_size_y + 4) * cn_size * sizeof(short)) +
                    sobel_bufsize +
                    ((block_size_x + 2) * (block_size_y + 2) * 1 * sizeof(int)) +
