@@ -40,6 +40,8 @@
 //
 //M*/
 
+#define FORCE_OPENCL_PROFILING
+
 #include "precomp.hpp"
 
 #include <opencv2/core/utils/logger.defines.hpp>
@@ -806,7 +808,11 @@ static bool ocl_sepRowFilter2D(const UMat & src, UMat & buf, const Mat & kernelX
                srcOffset.y, src.cols, src.rows, srcWholeSize.width, srcWholeSize.height,
                ocl::KernelArg::PtrWriteOnly(buf), (int)buf.step, buf.cols, buf.rows, radiusY);
 
+#ifdef FORCE_OPENCL_PROFILING
+    return k.runProfiling(2, globalsize, localsize);
+#else
     return k.run(2, globalsize, localsize, false);
+#endif
 }
 
 static bool ocl_sepColFilter2D(const UMat & buf, UMat & dst, const Mat & kernelY, double delta, int anchor,
@@ -862,7 +868,11 @@ static bool ocl_sepColFilter2D(const UMat & buf, UMat & dst, const Mat & kernelY
     k.args(ocl::KernelArg::ReadOnly(buf), ocl::KernelArg::WriteOnly(dst),
            static_cast<float>(delta * (1u << (2 * shift_bits))));
 
+#ifdef FORCE_OPENCL_PROFILING
+    return k.runProfiling(2, globalsize, localsize);
+#else
     return k.run(2, globalsize, localsize, false);
+#endif
 }
 
 const int optimizedSepFilterLocalWidth  = 16;

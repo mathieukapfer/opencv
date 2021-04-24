@@ -49,6 +49,8 @@
 
 #include "opencv2/core/openvx/ovx_defs.hpp"
 
+#define FORCE_OPENCL_PROFILING
+
 namespace cv
 {
 
@@ -273,7 +275,6 @@ static bool ocl_Canny_kalray(InputArray _src, const UMat& dx_, const UMat& dy_, 
         with_sobel.args(ocl::KernelArg::ReadOnly(src),
                         ocl::KernelArg::WriteOnlyNoSize(map),
                         (float) low, (float) high);
-
 #ifdef FORCE_OPENCL_PROFILING
         if (!with_sobel.runProfiling(2, globalsize, localsize))
 #else
@@ -453,8 +454,12 @@ static bool ocl_Canny(InputArray _src, const UMat& dx_, const UMat& dy_, OutputA
         size_t globalsize[2] = { (size_t)size.width, (size_t)size.height },
                 localsize[2] = { (size_t)lSizeX, (size_t)lSizeY };
 
+#ifdef FORCE_OPENCL_PROFILING
+        if (!with_sobel.runProfiling(2, globalsize, localsize))
+#else
         if (!with_sobel.run(2, globalsize, localsize, false))
-            return false;
+#endif
+          return false;
     }
     else
     {
@@ -496,8 +501,12 @@ static bool ocl_Canny(InputArray _src, const UMat& dx_, const UMat& dy_, OutputA
         size_t globalsize[2] = { (size_t)size.width, (size_t)size.height },
                 localsize[2] = { (size_t)lSizeX, (size_t)lSizeY };
 
+#ifdef FORCE_OPENCL_PROFILING
+        if (!without_sobel.runProfiling(2, globalsize, localsize))
+#else
         if (!without_sobel.run(2, globalsize, localsize, false))
-            return false;
+#endif
+          return false;
     }
 
     int PIX_PER_WI = 8;
@@ -520,8 +529,12 @@ static bool ocl_Canny(InputArray _src, const UMat& dx_, const UMat& dy_, OutputA
         return false;
 
     edgesHysteresis.args(ocl::KernelArg::ReadWrite(map));
+#ifdef FORCE_OPENCL_PROFILING
+    if (!edgesHysteresis.runProfiling(2, globalsize, localsize))
+#else
     if (!edgesHysteresis.run(2, globalsize, localsize, false))
-        return false;
+#endif
+      return false;
 
     // get edges
 
@@ -535,7 +548,11 @@ static bool ocl_Canny(InputArray _src, const UMat& dx_, const UMat& dy_, OutputA
 
     getEdgesKernel.args(ocl::KernelArg::ReadOnly(map), ocl::KernelArg::WriteOnlyNoSize(dst));
 
+#ifdef FORCE_OPENCL_PROFILING
+    return getEdgesKernel.runProfiling(2, globalsize, NULL);
+#else
     return getEdgesKernel.run(2, globalsize, NULL, false);
+#endif
 }
 
 #endif
