@@ -90,7 +90,7 @@ configure:
 	mkdir -p build
 	cd build && cmake --debug-find ..  \
 				-DCMAKE_EXPORT_COMPILE_COMMANDS=ON  \
-				-DCMAKE_BUILD_TYPE=Release \
+				-DCMAKE_BUILD_TYPE=Debug \
 				-DCMAKE_TOOLCHAIN_FILE=./platforms/kvx/kvx.toolchain.cmake \
 				-DCMAKE_C_FLAGS="$(shell pkg-config --cflags kaf-core)" \
 				-DCMAKE_CXX_FLAGS="$(shell pkg-config --cflags kaf-core)" \
@@ -132,6 +132,7 @@ ENABLE_MPPA_DEFAULT_MODE=	\
 	OPENCV_OPENCL_DEVICE=':ACCELERATOR:'
 
 ENABLE_GPU=	\
+	LD_PRELOAD=/etc/alternatives/nvidia--libnvidia-opencl.so.1-x86_64-linux-gnu
 	OPENCV_OPENCL_DEVICE=':GPU:'
 
 ENABLE_MPPA_IN_SPMD_MODE= \
@@ -241,7 +242,7 @@ POCL_DEBUG=timing
 #TIME=time
 
 build_perf_canny:
-		cd build && make opencv_perf_imgproc
+		cd build && make opencv_perf_imgproc  -j`nproc`
 
 parser-with-timing:
 	emacs --batch --load $(PWD)/platforms/kvx/format_report.el --eval "(my-format-perf-report \"$(OUTPUT).log\")" | tee $(OUTPUT)_parsed.log
