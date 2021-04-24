@@ -38,7 +38,8 @@ help:
 # configure
 # ----------
 configure:
-	mkdir -p build && cd build && OpenCV_DIR=$(OpenCV_DIR)  cmake ..
+	mkdir -p build && cd build && OpenCV_DIR=$(OpenCV_DIR)  cmake -DCMAKE_BUILD_TYPE=Debug \
+..
 
 # build
 # ----------
@@ -78,9 +79,10 @@ RUN_ENV_MPPA= \
 	POCL_DEBUG=${POCL_DEBUG} \
 
 RUN_ENV_GPU= \
-	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16 \
+	OPENCV_OPENCL_DEVICE=':GPU:' \
+	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=256 \
 
-RUN_ENV=$(RUN_ENV_MPPA)
+RUN_ENV=$(RUN_ENV_GPU)
 
 ## run target
 ## ----------

@@ -97,6 +97,14 @@ configure:
 				-DCMAKE_INSTALL_PREFIX=${opencv_prefix}\
 				-DOPENCV_TEST_INSTALL_PATH=${opencv_test_bin_path}\
 
+configure-gpu:
+	mkdir -p build
+	cd build && cmake --debug-find ..  \
+				-DCMAKE_EXPORT_COMPILE_COMMANDS=ON  \
+				-DCMAKE_BUILD_TYPE=Debug \
+				-DCMAKE_INSTALL_PREFIX=${opencv_prefix}\
+				-DOPENCV_TEST_INSTALL_PATH=${opencv_test_bin_path}\
+
 
 # trigger 'configure' the first time target 'compile' is called
 build:
