@@ -176,12 +176,15 @@ IMPLEMENT_ASYNC_COPY_2D2D_FUNCS(float, "%.3f");
 #endif
 #define storepix(value, addr) *(__global int *)(addr) = (int)(value)
 
-#define IN_WIDTH  (GRP_SIZEX + 2 + APRT-1)
-#define IN_HEIGHT (GRP_SIZEY + 2 + APRT-1)
+#define NMS_HALO_SIZE    (1)
+#define SOBEL_HALO_SIZE  (APRT/2)  // (APRT always odd, if 3 returns 1, if 5 returns 2)
+
+#define IN_WIDTH  (GRP_SIZEX + 2*NMS_HALO_SIZE + 2*SOBEL_HALO_SIZE)
+#define IN_HEIGHT (GRP_SIZEY + 2*NMS_HALO_SIZE + 2*SOBEL_HALO_SIZE)
 #define IN_OFFSET_Y(cur, dist) ((cur) + (dist) * IN_WIDTH)
 
-#define MAG_WIDTH  (GRP_SIZEX + 2)
-#define MAG_HEIGHT (GRP_SIZEY + 2)
+#define MAG_WIDTH  (GRP_SIZEX + 2*NMS_HALO_SIZE)
+#define MAG_HEIGHT (GRP_SIZEY + 2*NMS_HALO_SIZE)
 #define MAG_OFFSET_Y(cur, dist) ((cur) + (dist) * MAG_WIDTH)
 
 #define OUT_WIDTH  (GRP_SIZEX + 0)
@@ -321,7 +324,7 @@ inline void sobel_sep_row(int in_idx, int out_idx, __local const shortN *smem, _
 // cn==3 not supported
 #if cn == 1
     short sum_x = 0, sum_y = 0;
-    int start_x = in_idx - (APRT>>1);
+    int start_x = in_idx - SOBEL_HALO_SIZE;
     #pragma unroll
     for (int i=0; i<APRT; i++)
     {
@@ -354,7 +357,7 @@ static inline void stage1_separable_sobel_compute_block(
 
     for (int y = start_in_row; y < end_in_row; y++) {
         int out_idx = MAG_OFFSET_Y(0, y);
-        int in_idx = IN_OFFSET_Y(APRT>>1, y);
+        int in_idx = IN_OFFSET_Y(SOBEL_HALO_SIZE, y);
         for(int x=0;x<MAG_WIDTH/16;x++) {
             #pragma unroll
             for (int iter = 0; iter < 16; iter++) {
@@ -522,43 +525,42 @@ static inline void stage1_nms_compute_block(
 // https://hal.univ-grenoble-alpes.fr/hal-01652614/document
 static inline int local_offset(const int iblock, const int num_blocks)
 {
-    return (iblock == 0 ? 1 + (APRT>>1) : 0);
+    return (iblock == 0 ? (NMS_HALO_SIZE + SOBEL_HALO_SIZE) : 0);
 }
 static inline int remote_offset(const int iblock, const int num_blocks)
 {
-    return (iblock == 0 ? 0 : -1 -(APRT>>1));
+    return (iblock == 0 ? 0 : -(NMS_HALO_SIZE + SOBEL_HALO_SIZE));
 }
 static inline int halo_cutoff(const int iblock, const int num_blocks)
 {
-    return ((iblock > 0 && iblock < (num_blocks - 1)) ? 0 : -1 - (APRT>>1));
+    return ((iblock > 0 && iblock < (num_blocks - 1)) ? 0 : -(NMS_HALO_SIZE + SOBEL_HALO_SIZE));
 }
 
 __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src_offset, int rows, int cols,
                                 __global uchar *map, int map_step, int map_offset,
                                 float low_thr, float high_thr)
 {
-    //                                GRP_SIZEX + 2 + APRT-1
+    //                                GRP_SIZEX + 2*NMS_HALO_SIZE +
+    //                                            2*SOBEL_HALO_SIZE
     //                         +--------------------------------+
     //                         |                                |
     //                         |    +----------------------+    |
     //                         |    |      GRP_SIZEX       |    |
     //                         |    |                      |    |
     //                         |    |                      |    |
-    // GRP_SIZEY + 2 + APRT-1  |    | GRP_SIZEY            |    |
-    //                         |    |                      |    |
-    //                         |    |                      |    |
+    //     GRP_SIZEY +         |    | GRP_SIZEY            |    |
+    //     2*NMS_HALO_SIZE +   |    |                      |    |
+    //     2*SOBEL_HALO_SIZE   |    |                      |    |
     //                         |    +----------------------+    |
     //                         |                                |
     //                         +--------------------------------+
     //
 
     // input double buffer
-    __local TYPEN  smem_src_even[IN_WIDTH * IN_HEIGHT];
-    __local TYPEN  smem_src_odd [IN_WIDTH * IN_HEIGHT];
-    __local TYPEN *smem_src[2] = {smem_src_even, smem_src_odd};
-
+    __local TYPEN  smem_src[2][IN_WIDTH * IN_HEIGHT];
     __local shortN smem [IN_WIDTH * IN_HEIGHT];
 
+    // intermediate buffers
     __local short  magx[MAG_WIDTH * MAG_HEIGHT];
     __local short  magy[MAG_WIDTH * MAG_HEIGHT];
 #if APRT > 3
@@ -570,9 +572,7 @@ __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src
     __local int magz[MAG_WIDTH * MAG_HEIGHT];
 
     // output double buffers
-    __local uchar map_out_even[GRP_SIZEX * GRP_SIZEY];
-    __local uchar map_out_odd [GRP_SIZEX * GRP_SIZEY];
-    __local uchar *map_out[2] = {map_out_even, map_out_odd};
+    __local uchar map_out[2][GRP_SIZEX * GRP_SIZEY];
 
     const int lsizex = get_local_size(0);
     const int lsizey = get_local_size(1);
@@ -605,8 +605,10 @@ __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src
     // Assumption: there are at least >= 2 blocks in each row and col dimension
     const int2 block_output_first = {clamp(GRP_SIZEX, GRP_SIZEX, cols - (GRP_SIZEX * iblock_x_next)),
                                      clamp(GRP_SIZEY, GRP_SIZEY, rows - (GRP_SIZEY * iblock_y_next))};
-    int2 block_size   = {(block_output_first.x + 2 + APRT-1) + halo_cutoff(iblock_x_next, num_blocks_x),
-                         (block_output_first.y + 2 + APRT-1) + halo_cutoff(iblock_y_next, num_blocks_y)};
+    int2 block_size   = {(block_output_first.x + 2*NMS_HALO_SIZE + 2*SOBEL_HALO_SIZE) +
+                          halo_cutoff(iblock_x_next, num_blocks_x),
+                         (block_output_first.y + 2*NMS_HALO_SIZE + 2*SOBEL_HALO_SIZE) +
+                          halo_cutoff(iblock_y_next, num_blocks_y)};
 
     // local write position and dimension
     int4 local_point  = {0 + local_offset(iblock_x_next, num_blocks_x),
@@ -655,8 +657,10 @@ __kernel void stage1_with_sobel(__global const uchar *src, int src_step, int src
         // Assumption: there are at least >= 2 blocks in each row and col dimension
         const int2 block_output_next = {clamp(GRP_SIZEX, GRP_SIZEX, cols - (GRP_SIZEX * iblock_x_next)),
                                         clamp(GRP_SIZEY, GRP_SIZEY, rows - (GRP_SIZEY * iblock_y_next))};
-        const int2 block_size_next = {(block_output_next.x + 2 + APRT-1) + halo_cutoff(iblock_x_next, num_blocks_x),
-                                      (block_output_next.y + 2 + APRT-1) + halo_cutoff(iblock_y_next, num_blocks_y)};
+        const int2 block_size_next = {(block_output_next.x + 2*NMS_HALO_SIZE + 2*SOBEL_HALO_SIZE) +
+                                       halo_cutoff(iblock_x_next, num_blocks_x),
+                                      (block_output_next.y + 2*NMS_HALO_SIZE + 2*SOBEL_HALO_SIZE) +
+                                       halo_cutoff(iblock_y_next, num_blocks_y)};
         const int2 local_pos_next  = {0 + local_offset(iblock_x_next, num_blocks_x),
                                       0 + local_offset(iblock_y_next, num_blocks_y)};
         const int2 global_pos_next = {(GRP_SIZEX * iblock_x_next) + remote_offset(iblock_x_next, num_blocks_x),

@@ -133,6 +133,89 @@ static bool ipp_Canny(const Mat& src , const Mat& dx_, const Mat& dy_, Mat& dst,
 
 #ifdef HAVE_OPENCL
 
+/**
+ * @brief    __local footprint calculation, based on canny_kalray.cl implementation
+ *           Must always reflect the __local usage in canny_kalray.cl
+ *
+ * @param      _src          Input src image
+ * @param[in]  cn            Number of pixel channels in input image
+ * @param[in]  block_size_x  Block size x
+ * @param[in]  block_size_y  Block size y
+ * @param[in]  aperture      Aperture
+ *
+ * @return    __local size usage in canny_kalray.cl
+ */
+static size_t stage1_with_sobel_local_footprint(InputArray &_src, const int cn,
+                                                const int block_size_x,
+                                                const int block_size_y,
+                                                const int aperture)
+{
+    // TYPE3 is actually TYPE4, with the 4th element being padding.
+    const int cn_size = cn == 3 ? 4 : cn;
+
+    // get image size while avoiding useless transfer (keep same type as src)
+    const size_t src_elemsize = _src.isMat() ? _src.getMat().elemSize() : _src.getUMat().elemSize();
+
+    // ----------------------------------------------------------------
+    // Roll out all macros and  __local buffer declarations in
+    // canny_kalray.cl for local footprint calculation.
+    // ----------------------------------------------------------------
+    // #define NMS_HALO_SIZE    (1)
+    const int nms_halo_size   = (1);
+    // #define SOBEL_HALO_SIZE  (APRT/2)  // (APRT always odd, if 3 returns 1, if 5 returns 2)
+    const int sobel_halo_size = (aperture/2);
+
+    // #define IN_WIDTH    (GRP_SIZEX + 2*NMS_HALO_SIZE + 2*SOBEL_HALO_SIZE)
+    const int in_width   = (block_size_x + 2*nms_halo_size + 2*sobel_halo_size);
+    // #define IN_HEIGHT   (GRP_SIZEY + 2*NMS_HALO_SIZE + 2*SOBEL_HALO_SIZE)
+    const int in_height  = (block_size_y + 2*nms_halo_size + 2*sobel_halo_size);
+
+    // #define MAG_WIDTH   (GRP_SIZEX + 2*NMS_HALO_SIZE)
+    const int mag_width  = (block_size_x + 2*nms_halo_size);
+    // #define MAG_HEIGHT  (GRP_SIZEY + 2*NMS_HALO_SIZE)
+    const int mag_height = (block_size_y + 2*nms_halo_size);
+
+    // ----------------------------------------------------------------
+    // input double buffer: TYPEN == src_elemsize
+    // ----------------------------------------------------------------
+    size_t local_input_buffers = 0;
+    // __local TYPEN  smem_src[2][IN_WIDTH * IN_HEIGHT];
+    local_input_buffers += (src_elemsize * 2 * (in_width * in_height));
+    // __local shortN smem [IN_WIDTH * IN_HEIGHT];
+    local_input_buffers += cn_size * sizeof(short) * (in_width * in_height);
+
+    // ----------------------------------------------------------------
+    // intermediate buffers
+    // ----------------------------------------------------------------
+    size_t local_intermediate_buffers = 0;
+    // __local short  magx[MAG_WIDTH * MAG_HEIGHT];
+    local_intermediate_buffers += sizeof(short) * (mag_width * mag_height);
+    // __local short  magy[MAG_WIDTH * MAG_HEIGHT];
+    local_intermediate_buffers += sizeof(short) * (mag_width * mag_height);
+
+    if (aperture > 3) {
+        // __local short half_dx[MAG_WIDTH * IN_HEIGHT];
+        local_intermediate_buffers += sizeof(short) * (mag_width * in_height);
+        // __local short half_dy[MAG_WIDTH * IN_HEIGHT];
+        local_intermediate_buffers += sizeof(short) * (mag_width * in_height);
+    }
+    // __local int magz[MAG_WIDTH * MAG_HEIGHT];
+    local_intermediate_buffers += sizeof(int) * (mag_width * mag_height);
+
+    // ----------------------------------------------------------------
+    // output double buffers
+    // ----------------------------------------------------------------
+    size_t local_output_buffers = 0;
+    // __local uchar map_out[2][GRP_SIZEX * GRP_SIZEY];
+    local_output_buffers += sizeof(unsigned char) * 2 * (block_size_x * block_size_y);
+
+    // total
+    const size_t local_total_size = local_input_buffers +
+                                    local_intermediate_buffers +
+                                    local_output_buffers;
+    return local_total_size;
+};
+
 template <bool useCustomDeriv>
 static bool ocl_Canny_kalray(InputArray _src, const UMat& dx_, const UMat& dy_, OutputArray _dst, float low_thresh, float high_thresh,
                       int aperture_size, bool L2gradient, int cn, const Size & size)
@@ -208,37 +291,11 @@ static bool ocl_Canny_kalray(InputArray _src, const UMat& dx_, const UMat& dy_, 
         const int ideal_num_blocks_height = size.height / 8;
 
         // tune blocksize to make sure it fits in __local
-        auto stage1_with_sobel_local_footprint = [cn, &_src](int block_size_x, int block_size_y, int aperture)
-        {
-            // TYPE3 is actually TYPE4, with the 4th element being padding.
-            int cn_size = cn == 3 ? 4 : cn;
-
-            // get image size while avoiding useless transfer (keep same type as src)
-            const size_t src_elemsize = _src.isMat() ? _src.getMat().elemSize() : _src.getUMat().elemSize();
-            int sobel_bufsize;
-            if (aperture == 3)
-            {
-                sobel_bufsize = ((block_size_x + 2) * (block_size_y + 2) * 2 * sizeof(short));
-            }
-            else
-            {
-                sobel_bufsize = ((block_size_x + 2) * (block_size_y + 1 + aperture) * 4 * sizeof(short));
-            }
-
-            // This formula is developed in canny.cl, and is not the same
-            // for every kernels
-            return ((block_size_x + 4) * (block_size_y + 4) * 2 *  src_elemsize) +
-                   ((block_size_x + 4) * (block_size_y + 4) * cn_size * sizeof(short)) +
-                   sobel_bufsize +
-                   ((block_size_x + 2) * (block_size_y + 2) * 1 * sizeof(int)) +
-                   (block_size_x * block_size_y * 2 * sizeof(unsigned char));
-        };
-
         // let's start with the ideal blocksize
         int max_block_size = std::min(ideal_num_blocks_width, ideal_num_blocks_height);
 
         // if blocksize too big, reduce it gradually
-        while (stage1_with_sobel_local_footprint(max_block_size, max_block_size, aperture_size) > max_local_mem_size)
+        while (stage1_with_sobel_local_footprint(_src, cn, max_block_size, max_block_size, aperture_size) > max_local_mem_size)
         {
             max_block_size -= 16;
         }
