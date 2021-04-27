@@ -7,8 +7,6 @@
 #define IN_HEIGHT (GRP_SIZEY + (2 * HALO_SIZE))
 #define IN_OFFSET_Y(cur, dist) ((cur) + (dist) * IN_WIDTH)
 
-#define CONTIGUOUS_POINTS 9
-
 #if NMS
 static inline int compute_score(int p,
                                 int* halo_pixels)
