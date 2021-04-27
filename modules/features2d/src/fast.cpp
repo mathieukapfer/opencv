@@ -299,14 +299,10 @@ struct cmp_pt
 };
 
 static bool ocl_FAST_kalray( InputArray _img, std::vector<KeyPoint>& keypoints,
-                     int threshold, bool nonmax_suppression, int maxKeypoints )
+                     int threshold, bool nonmax_suppression )
 {
     // OpenCL kernel source used
     struct cv::ocl::internal::ProgramEntry used_fast_oclsrc = ocl::features2d::fast_kalray_oclsrc;
-
-    // If maxKeypoints is set to 0, we should not report any keypoint.
-    if (maxKeypoints == 0)
-        return true;
 
     // The FAST algorith requires a 7x7 mat to check if pixel p is a keypoint
     UMat img = _img.getUMat();
@@ -343,6 +339,10 @@ static bool ocl_FAST_kalray( InputArray _img, std::vector<KeyPoint>& keypoints,
     if (fastKptKernel.empty())
         return false;
 
+    // Number of keypoints than OpenCL can return.
+    // In the GPU implementation, the limit is fixed at 10000.
+    // To remove this limitation, set the value to cols*rows.
+    int maxKeypoints = 10000;
     int dimension = nonmax_suppression ? 3 : 2;
     UMat kp1(1, maxKeypoints*dimension+1, CV_32S, Scalar(0));
 
@@ -394,16 +394,17 @@ static bool ocl_FAST_kalray( InputArray _img, std::vector<KeyPoint>& keypoints,
 }
 
 static bool ocl_FAST( InputArray _img, std::vector<KeyPoint>& keypoints,
-                     int threshold, bool nonmax_suppression, int maxKeypoints )
+                     int threshold, bool nonmax_suppression )
 {
     const ocl::Device &dev = ocl::Device::getDefault();
 
     // If Kalray device, use custom Kalray function
     if (dev.isKalray())
     {
-        return ocl_FAST_kalray(_img, keypoints, threshold, nonmax_suppression, maxKeypoints);
+        return ocl_FAST_kalray(_img, keypoints, threshold, nonmax_suppression);
     }
 
+    int maxKeypoints = 10000;
     UMat img = _img.getUMat();
     if( img.cols < 7 || img.rows < 7 )
         return false;
@@ -601,7 +602,7 @@ void FAST(InputArray _img, std::vector<KeyPoint>& keypoints, int threshold, bool
     CV_INSTRUMENT_REGION();
 
     CV_OCL_RUN(_img.isUMat() && type == FastFeatureDetector::TYPE_9_16,
-               ocl_FAST(_img, keypoints, threshold, nonmax_suppression, 10000));
+               ocl_FAST(_img, keypoints, threshold, nonmax_suppression));
 
     cv::Mat img = _img.getMat();
     CALL_HAL(fast_dense, hal_FAST, img, keypoints, threshold, nonmax_suppression, type);
