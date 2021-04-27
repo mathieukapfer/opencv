@@ -7,8 +7,6 @@
 #define IN_HEIGHT (GRP_SIZEY + (2 * HALO_SIZE))
 #define IN_OFFSET_Y(cur, dist) ((cur) + (dist) * IN_WIDTH)
 
-#define CONTIGUOUS_POINTS 9
-
 #if NMS
 static inline int compute_score(int p,
                                 int* halo_pixels)
@@ -187,7 +185,7 @@ static inline void fast_compute_block(
 
             // To have CONTIGUOUS_POINTS contiguous pixels of our halo to be brighter or darker,
             // we need at least `cardinal_points` cardinal points to be all brighter or all darker.
-            int cardinal_points = 2;
+            int cardinal_points = (CONTIGUOUS_POINTS == 9) ? 2 : 3;
             if ((popcount(brighter) < cardinal_points) &&
                 (popcount(darker) < cardinal_points))
             {
@@ -220,7 +218,7 @@ static inline void fast_compute_block(
             UPDATE_MASK(14, halo_points[14]);
             UPDATE_MASK(15, halo_points[15]);
 
-            int mask = 0x1FF;
+            int mask = (CONTIGUOUS_POINTS == 9) ? 0x1FF : 0xFFF;
             #define CHECK(shift) \
                 (((brighter & (mask << shift)) == (mask << shift)) | \
                 ((darker & (mask << shift)) == (mask << shift)))

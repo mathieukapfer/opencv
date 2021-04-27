@@ -542,7 +542,7 @@ class CV_EXPORTS_W FastFeatureDetector : public Feature2D
 public:
     enum DetectorType
     {
-        TYPE_5_8 = 0, TYPE_7_12 = 1, TYPE_9_16 = 2
+        TYPE_5_8 = 0, TYPE_7_12 = 1, TYPE_9_16 = 2, TYPE_12_16 = 3
     };
     enum
     {
@@ -577,9 +577,9 @@ CV_EXPORTS void FAST( InputArray image, CV_OUT std::vector<KeyPoint>& keypoints,
 circle around this pixel.
 @param nonmaxSuppression if true, non-maximum suppression is applied to detected corners
 (keypoints).
-@param type one of the three neighborhoods as defined in the paper:
-FastFeatureDetector::TYPE_9_16, FastFeatureDetector::TYPE_7_12,
-FastFeatureDetector::TYPE_5_8
+@param type one of the four neighborhoods as defined in the paper:
+FastFeatureDetector::TYPE_12_16, FastFeatureDetector::TYPE_9_16,
+FastFeatureDetector::TYPE_7_12, FastFeatureDetector::TYPE_5_8
 
 Detects corners using the FAST algorithm by @cite Rosten06 .
 

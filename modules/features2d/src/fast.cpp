@@ -51,6 +51,8 @@ The references are:
 
 #include "opencv2/core/openvx/ovx_defs.hpp"
 
+#include <iostream>
+
 namespace cv
 {
 
@@ -299,7 +301,8 @@ struct cmp_pt
 };
 
 static bool ocl_FAST_kalray( InputArray _img, std::vector<KeyPoint>& keypoints,
-                     int threshold, bool nonmax_suppression )
+                     int threshold, bool nonmax_suppression,
+                     FastFeatureDetector::DetectorType type )
 {
     // OpenCL kernel source used
     struct cv::ocl::internal::ProgramEntry used_fast_oclsrc = ocl::features2d::fast_kalray_oclsrc;
@@ -310,6 +313,15 @@ static bool ocl_FAST_kalray( InputArray _img, std::vector<KeyPoint>& keypoints,
     {
         return false;
     }
+
+    // Currently, the implementation only support TYPE_9_16 and TYPE_12_16
+    if ((type != FastFeatureDetector::TYPE_9_16) &&
+        (type != FastFeatureDetector::TYPE_12_16))
+    {
+        return false;
+    }
+
+    int contiguous = (type == FastFeatureDetector::TYPE_12_16) ? 12 : 9;
 
     const ocl::Device &dev = ocl::Device::getDefault();
 
@@ -336,8 +348,8 @@ static bool ocl_FAST_kalray( InputArray _img, std::vector<KeyPoint>& keypoints,
 
     // Kernel setup
     ocl::Kernel fastKptKernel("FAST_findKeypoints", used_fast_oclsrc,
-                              format("-D GRP_SIZEX=%d -D GRP_SIZEY=%d -D NMS=%d",
-                              grp_sizex, grp_sizey, nonmax_suppression));
+                              format("-D GRP_SIZEX=%d -D GRP_SIZEY=%d -D NMS=%d -D CONTIGUOUS_POINTS=%d",
+                              grp_sizex, grp_sizey, nonmax_suppression, contiguous));
     if (fastKptKernel.empty())
     {
         return false;
@@ -408,14 +420,20 @@ static bool ocl_FAST_kalray( InputArray _img, std::vector<KeyPoint>& keypoints,
 }
 
 static bool ocl_FAST( InputArray _img, std::vector<KeyPoint>& keypoints,
-                     int threshold, bool nonmax_suppression )
+                     int threshold, bool nonmax_suppression,
+                     FastFeatureDetector::DetectorType type )
 {
     const ocl::Device &dev = ocl::Device::getDefault();
 
     // If Kalray device, use custom Kalray function
     if (dev.isKalray())
     {
-        return ocl_FAST_kalray(_img, keypoints, threshold, nonmax_suppression);
+        return ocl_FAST_kalray(_img, keypoints, threshold, nonmax_suppression, type);
+    }
+
+    if (type != FastFeatureDetector::TYPE_9_16)
+    {
+        return false;
     }
 
     int maxKeypoints = 10000;
@@ -615,8 +633,8 @@ void FAST(InputArray _img, std::vector<KeyPoint>& keypoints, int threshold, bool
 {
     CV_INSTRUMENT_REGION();
 
-    CV_OCL_RUN(_img.isUMat() && type == FastFeatureDetector::TYPE_9_16,
-               ocl_FAST(_img, keypoints, threshold, nonmax_suppression));
+    CV_OCL_RUN(_img.isUMat(),
+               ocl_FAST(_img, keypoints, threshold, nonmax_suppression, type));
 
     cv::Mat img = _img.getMat();
     CALL_HAL(fast_dense, hal_FAST, img, keypoints, threshold, nonmax_suppression, type);
@@ -637,6 +655,9 @@ void FAST(InputArray _img, std::vector<KeyPoint>& keypoints, int threshold, bool
         break;
     case FastFeatureDetector::TYPE_9_16:
         FAST_t<16>(_img, keypoints, threshold, nonmax_suppression);
+        break;
+    case FastFeatureDetector::TYPE_12_16:
+        std::cerr << "Not implemented yet: TYPE_12_16" << std::endl;
         break;
     }
 }
