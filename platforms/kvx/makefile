@@ -319,6 +319,11 @@ _run_canny_perf_mppa:
 # wrapper
 run_fast_perf_mppa: build_perf_fast _run_fast_perf_mppa
 
+# tips to produce lsit of 'fast' test cases
+FAST_TEST_LIST=$(foreach num, 0 1 2 9 10 11 18 19 20,*OCL_feature2d_detect.detect/$(num):)
+empty:=
+space:= $(empty) $(empty)
+
 # target without dependancies (for CI)
 _run_fast_perf_mppa:
 	@echo
@@ -329,5 +334,5 @@ _run_fast_perf_mppa:
 	${COMMUN_ENV} \
   ${ENABLE_MPPA_IN_SPMD_MODE} \
 	${TIME} ${VALGRING} opencv_perf_features2d --perf_force_samples=$(FORCE_SAMPLE) \
-	--gtest_filter="*OCL_feature2d_detect.detect/*" 2>&1 | tee $@.log
+	--gtest_filter="$(subst $(space),,$(FAST_TEST_LIST))" 2>&1 | tee $@.log
 	OUTPUT=$@ make _canny_perf_parser
