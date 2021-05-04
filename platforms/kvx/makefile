@@ -166,7 +166,7 @@ run_mppa_all_test:
 # targets to run all *perf* suite
 # ======================================================================================
 
-FORCE_SAMPLE:=1
+FORCE_SAMPLE:=10
 
 run_gpu_all_perf:
 	ls build/bin/opencv_perf_* > perf_list
@@ -265,10 +265,10 @@ run_mppa_bench:
 # Canny kernels
 # ======================================================================================
 
-_canny_perf_parser:
+_perf_parser:
 	@emacs --batch --no-init-file --load $(PWD)/platforms/kvx/format_report.el --eval "(my-format-perf-report \"$(OUTPUT).log\")" >  $(OUTPUT)_parsed.log
 	@if [ $(FORCE_SAMPLE) -gt 1 ]; then \
-		cat $(OUTPUT)_parsed.log | sed  "s/stage1/\n\tstage1/g" | tee $(KALRAY_BENCH_OUTPUT); \
+		cat $(OUTPUT)_parsed.log | sed  "s/$(FIRST_KERNEL_NAME)/\n\t$(FIRST_KERNEL_NAME)/g" | tee $(KALRAY_BENCH_OUTPUT); \
 	else \
 		cat $(OUTPUT)_parsed.log | tee $(KALRAY_BENCH_OUTPUT); \
 	fi
@@ -283,7 +283,7 @@ run_canny_perf_gpu: build_perf_canny
   ${ENABLE_GPU} \
 	${TIME} ${VALGRING} opencv_perf_imgproc --perf_force_samples=$(FORCE_SAMPLE) \
 	--gtest_filter="*CL_CannyFixture_Canny.Canny*"  2>&1 | tee $@.log
-	OUTPUT=$@ make _canny_perf_parser
+	OUTPUT=$@ make _perf_parser
 
 # target with build dependencies (for development mode)
 run_canny_test_mppa: build_test_canny
@@ -310,7 +310,7 @@ _run_canny_perf_mppa:
   ${ENABLE_MPPA_IN_SPMD_MODE} \
 	${TIME} ${VALGRING} opencv_perf_imgproc --perf_force_samples=$(FORCE_SAMPLE) \
 	--gtest_filter="*CL_CannyFixture_Canny.Canny/*" 2>&1 | tee $@.log
-	OUTPUT=$@ make _canny_perf_parser
+	OUTPUT=$@ FIRST_KERNEL_NAME="stage1" make _perf_parser
 
 
 # FAST kernels
@@ -335,4 +335,4 @@ _run_fast_perf_mppa:
   ${ENABLE_MPPA_IN_SPMD_MODE} \
 	${TIME} ${VALGRING} opencv_perf_features2d --perf_force_samples=$(FORCE_SAMPLE) \
 	--gtest_filter="$(subst $(space),,$(FAST_TEST_LIST))" 2>&1 | tee $@.log
-	OUTPUT=$@ make _canny_perf_parser
+	OUTPUT=$@ FIRST_KERNEL_NAME="FAST_findKeypoints" make _perf_parser
