@@ -1030,7 +1030,14 @@ bool ocl_sepFilter2D(
     UMat src = _src.getUMat();
 
     bool fast8uc1 = false;
+
+    // FIXME: disable this optim on ARM accelerated by Kalray MPPA due to unclear
+    // correctness issue (Ref T16351)
+#ifdef __aarch64__
+    if (type == CV_8UC1 && !d.isKalray())
+#else
     if (type == CV_8UC1)
+#endif  // __aarch64__
     {
         Size srcWholeSize;
         Point srcOffset;
@@ -1103,7 +1110,14 @@ bool ocl_sepFilter2D_BitExact(
     UMat src = _src.getUMat();
 
     bool fast8uc1 = false;
+
+    // FIXME: disable this optim on ARM accelerated by Kalray MPPA due to unclear
+    // correctness issue (Ref T16351)
+#ifdef __aarch64__
+    if (type == CV_8UC1 && !d.isKalray())
+#else
     if (type == CV_8UC1)
+#endif  //  __aarch64__
     {
         Size srcWholeSize;
         Point srcOffset;
