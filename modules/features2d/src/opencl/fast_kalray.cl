@@ -131,6 +131,7 @@ static inline void fast_compute_block(
  * |    |    | 9  | 8 | 7 |   |   |
  *
  **/
+    int num_groups = get_num_groups(0) * get_num_groups(1);
     int nb_pe = get_local_size(1) * get_local_size(0);
     int cur_pe = get_local_id(0) * get_local_size(1) + get_local_id(1);
 
@@ -249,10 +250,11 @@ static inline void fast_compute_block(
                     }
                     // Add the location of the keypoint
                     // N clusters can write a maximum of num_kp_groups keypoints each.
-                    kp_loc[1 + KP_DIMENSION*index + (num_kp_groups*KP_DIMENSION)*group_id] = global_point.x + block_x;
-                    kp_loc[2 + KP_DIMENSION*index + (num_kp_groups*KP_DIMENSION)*group_id] = global_point.y + block_y;
+                    // The M first values of kp_loc are used to store the number of keypoints detected by each of the M clusters.
+                    kp_loc[num_groups + KP_DIMENSION*index + (num_kp_groups*KP_DIMENSION)*group_id] = global_point.x + block_x;
+                    kp_loc[(num_groups+1) + KP_DIMENSION*index + (num_kp_groups*KP_DIMENSION)*group_id] = global_point.y + block_y;
 #if NMS
-                    kp_loc[3 + KP_DIMENSION*index + (num_kp_groups*KP_DIMENSION)*group_id] = pixel_score;
+                    kp_loc[(num_groups+2) + KP_DIMENSION*index + (num_kp_groups*KP_DIMENSION)*group_id] = pixel_score;
 #endif // NMS
                 }
             }
@@ -422,11 +424,10 @@ void FAST_findKeypoints(
 
     }
 
-    if ((get_local_id(0) == get_local_id(1) == get_local_id(2) == 0) &&
-        (get_group_id(0) == (num_groups - 1)))
+    if ((get_local_id(0) == get_local_id(1) == get_local_id(2) == 0))
     {
-        // Set the number of key point found
-        kp_loc[0] = (num_groups - 1) * num_kp_groups + nb_kp;
+        kp_loc[group_id] = nb_kp;
     }
+
     async_work_group_copy_fence(CLK_GLOBAL_MEM_FENCE);
 }

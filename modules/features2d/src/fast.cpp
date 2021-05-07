@@ -343,8 +343,9 @@ static bool ocl_FAST_kalray( InputArray _img, std::vector<KeyPoint>& keypoints,
     int grp_sizex = max_block_size;
     int grp_sizey = max_block_size;
 
+    int max_compute_units = dev.maxComputeUnits();
     size_t localsize[] = { dev.maxWorkGroupSize(), 1 };
-    size_t globalsize[] = { localsize[0] * dev.maxComputeUnits(), localsize[1] };
+    size_t globalsize[] = { localsize[0] * max_compute_units, localsize[1] };
 
     // Kernel setup
     ocl::Kernel fastKptKernel("FAST_findKeypoints", used_fast_oclsrc,
@@ -360,9 +361,9 @@ static bool ocl_FAST_kalray( InputArray _img, std::vector<KeyPoint>& keypoints,
     // To remove this limitation, set the value to cols*rows.
     int maxKeypoints = 10000;
 
-    int num_kp_groups = maxKeypoints / dev.maxComputeUnits();
+    int num_kp_groups = maxKeypoints / max_compute_units;
     int dimension = nonmax_suppression ? 3 : 2;
-    UMat kp1(1, maxKeypoints*dimension+1, CV_32S, Scalar(0));
+    UMat kp1(1, maxKeypoints*dimension+max_compute_units, CV_32S);
 
     if (!fastKptKernel.args(ocl::KernelArg::ReadOnly(img),
                             ocl::KernelArg::PtrReadWrite(kp1),
@@ -373,7 +374,16 @@ static bool ocl_FAST_kalray( InputArray _img, std::vector<KeyPoint>& keypoints,
 
     Mat mcounter;
     kp1.copyTo(mcounter);
-    int counter = std::min(mcounter.at<int>(0), maxKeypoints);
+
+    int counters[max_compute_units];
+    int counter = 0;
+    int points_detected;
+    for (int i = 0; i < max_compute_units; i++)
+    {
+        points_detected = mcounter.at<int>(i);
+        counters[i] = points_detected;
+        counter += points_detected;
+    }
 
     keypoints.clear();
 
@@ -382,37 +392,43 @@ static bool ocl_FAST_kalray( InputArray _img, std::vector<KeyPoint>& keypoints,
         return true;
     }
 
-    // Return keypoint vector or compute NMS
+
+    #define SET_KEYPOINTS2D(id, num_keypoints)                              \
+        for(int i = 0; i < num_keypoints; i++ )                             \
+        {                                                                   \
+            keypoints.push_back(KeyPoint((float)pt[i+num_kp_groups*id].x,   \
+                                         (float)pt[i+num_kp_groups*id].y,   \
+                                          7.f, -1,                          \
+                                          1.f));                            \
+        }
+
+    #define SET_KEYPOINTS3D(id, num_keypoints)                              \
+        for(int i = 0; i < num_keypoints; i++ )                             \
+        {                                                                   \
+            keypoints.push_back(KeyPoint((float)pt[i+num_kp_groups*id].x,   \
+                                         (float)pt[i+num_kp_groups*id].y,   \
+                                         7.f, -1,                           \
+                                         (float)pt[i].z));                  \
+        }
+
     if (!nonmax_suppression)
     {
-        const Point* pt = (const Point*)(mcounter.ptr<int>() + 1);
-        for(int i = 0; i < counter; i++ )
+        const Point* pt = (const Point*)(mcounter.ptr<int>() + max_compute_units);
+
+        for (int cluster = 0; cluster < max_compute_units; cluster++)
         {
-            // Reconstruct the vector.
-            // We take advantage of this operation to remove the 0 padding.
-            float x = (float)pt[i].x;
-            float y = (float)pt[i].y;
-            if (x != 0 && y != 0)
-            {
-                keypoints.push_back(KeyPoint(x, y, 7.f, -1, 1.f));
-            }
+            SET_KEYPOINTS2D(cluster, counters[cluster]);
         }
     }
     else
     {
-        Point3i* pt = (Point3i*)(mcounter.ptr<int>() + 1);
+        Point3i* pt = (Point3i*)(mcounter.ptr<int>() + max_compute_units);
         // Sorting the points are quite costly on big images.
-        std::sort(pt, pt + counter, cmp_pt<Point3i>());
-        for (int i = 0; i < counter; i++)
+        std::sort(pt, pt + maxKeypoints, cmp_pt<Point3i>());
+
+        for (int cluster = 0; cluster < max_compute_units; cluster++)
         {
-            // Reconstruct the vector.
-            // We take advantage of this operation to remove the 0 padding.
-            float x = (float)pt[i].x;
-            float y = (float)pt[i].y;
-            if (x != 0 && y != 0)
-            {
-                keypoints.push_back(KeyPoint(x, y, 7.f, -1, (float)pt[i].z));
-            }
+            SET_KEYPOINTS3D(cluster, counters[cluster]);
         }
     }
 
