@@ -267,7 +267,7 @@ run_mppa_bench:
 
 _perf_parser:
 	@emacs --batch --no-init-file --load $(PWD)/platforms/kvx/format_report.el --eval "(my-format-perf-report \"$(OUTPUT).log\")" >  $(OUTPUT)_parsed.log
-	@if [ $(FORCE_SAMPLE) -gt 1 ]; then \
+	@if [ $(FORCE_SAMPLE) -gt 1 ] && [ "$(FIRST_KERNEL_NAME)" != "" ] ; then \
 		cat $(OUTPUT)_parsed.log | sed  "s/$(FIRST_KERNEL_NAME)/\n\t$(FIRST_KERNEL_NAME)/g" | tee $(KALRAY_BENCH_OUTPUT); \
 	else \
 		cat $(OUTPUT)_parsed.log | tee $(KALRAY_BENCH_OUTPUT); \
