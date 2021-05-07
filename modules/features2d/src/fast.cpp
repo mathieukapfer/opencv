@@ -342,17 +342,16 @@ static bool ocl_FAST_kalray( InputArray _img, std::vector<KeyPoint>& keypoints,
 
     // Kernel setup
     ocl::Kernel fastKptKernel("FAST_findKeypoints", used_fast_oclsrc,
-                              format("-D GRP_SIZEX=%d -D GRP_SIZEY=%d", grp_sizex, grp_sizey));
+                              format("-D GRP_SIZEX=%d -D GRP_SIZEY=%d -D NMS=%d",
+                              grp_sizex, grp_sizey, nonmax_suppression));
     if (fastKptKernel.empty())
     {
         return false;
     }
 
     int num_kp_groups = maxKeypoints / dev.maxComputeUnits();
-    UMat kp1(1, maxKeypoints*2+1, CV_32S, Scalar(0));
-
-    UMat ucounter1(kp1, Rect(0,0,1,1));
-    ucounter1.setTo(Scalar::all(0));
+    int dimension = nonmax_suppression ? 3 : 2;
+    UMat kp1(1, maxKeypoints*dimension+1, CV_32S, Scalar(0));
 
     if (!fastKptKernel.args(ocl::KernelArg::ReadOnly(img),
                             ocl::KernelArg::PtrReadWrite(kp1),
@@ -362,9 +361,8 @@ static bool ocl_FAST_kalray( InputArray _img, std::vector<KeyPoint>& keypoints,
     }
 
     Mat mcounter;
-    ucounter1.copyTo(mcounter);
-    int i, counter = mcounter.at<int>(0);
-    counter = std::min(counter, maxKeypoints);
+    kp1.copyTo(mcounter);
+    int counter = std::min(mcounter.at<int>(0), maxKeypoints);
 
     keypoints.clear();
 
@@ -376,10 +374,8 @@ static bool ocl_FAST_kalray( InputArray _img, std::vector<KeyPoint>& keypoints,
     // Return keypoint vector or compute NMS
     if (!nonmax_suppression)
     {
-        Mat m;
-        kp1(Rect(0, 0, counter*2+1, 1)).copyTo(m);
-        const Point* pt = (const Point*)(m.ptr<int>() + 1);
-        for( i = 0; i < counter; i++ )
+        const Point* pt = (const Point*)(mcounter.ptr<int>() + 1);
+        for(int i = 0; i < counter; i++ )
         {
             // Reconstruct the vector.
             // We take advantage of this operation to remove the 0 padding.
@@ -393,36 +389,19 @@ static bool ocl_FAST_kalray( InputArray _img, std::vector<KeyPoint>& keypoints,
     }
     else
     {
-        UMat kp2(1, maxKeypoints*3+1, CV_32S);
-        UMat ucounter2 = kp2(Rect(0,0,1,1));
-        ucounter2.setTo(Scalar::all(0));
-
-        ocl::Kernel fastNMSKernel("FAST_nonmaxSupression", used_fast_oclsrc,
-                                  format("-D GRP_SIZEX=%d -D GRP_SIZEY=%d", grp_sizex, grp_sizey));
-        if (fastNMSKernel.empty())
+        Point3i* pt = (Point3i*)(mcounter.ptr<int>() + 1);
+        // Sorting the points are quite costly on big images.
+        std::sort(pt, pt + counter, cmp_pt<Point3i>());
+        for (int i = 0; i < counter; i++)
         {
-            return false;
-        }
-
-        size_t globalsize_nms[] = { (size_t)counter };
-        if( !fastNMSKernel.args(ocl::KernelArg::PtrReadOnly(kp1),
-                                ocl::KernelArg::PtrReadWrite(kp2),
-                                ocl::KernelArg::ReadOnly(img),
-                                counter, counter).run(1, globalsize_nms, 0, true))
-        {
-            return false;
-        }
-
-        Mat m2;
-        kp2(Rect(0, 0, counter*3+1, 1)).copyTo(m2);
-        Point3i* pt2 = (Point3i*)(m2.ptr<int>() + 1);
-        int newcounter = std::min(m2.at<int>(0), counter);
-
-        std::sort(pt2, pt2 + newcounter, cmp_pt<Point3i>());
-
-        for (i = 0; i < newcounter; i++)
-        {
-            keypoints.push_back(KeyPoint((float)pt2[i].x, (float)pt2[i].y, 7.f, -1, (float)pt2[i].z));
+            // Reconstruct the vector.
+            // We take advantage of this operation to remove the 0 padding.
+            float x = (float)pt[i].x;
+            float y = (float)pt[i].y;
+            if (x != 0 && y != 0)
+            {
+                keypoints.push_back(KeyPoint(x, y, 7.f, -1, (float)pt[i].z));
+            }
         }
     }
 

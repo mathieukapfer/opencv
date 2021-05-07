@@ -1,12 +1,116 @@
 // OpenCL port of the FAST corner detector.
 // Copyright (C) 2014, Itseez Inc. See the license at http://opencv.org
 
-#define HALO_SIZE 3
+#define HALO_SIZE (3 + NMS)
+#define KP_DIMENSION (2 + NMS)
 #define IN_WIDTH (GRP_SIZEX + (2 * HALO_SIZE))
 #define IN_HEIGHT (GRP_SIZEY + (2 * HALO_SIZE))
 #define IN_OFFSET_Y(cur, dist) ((cur) + (dist) * IN_WIDTH)
 
 #define CONTIGUOUS_POINTS 9
+
+#if NMS
+static inline int compute_score(int p,
+                                int* halo_pixels)
+{
+    int k, a0 = 0, b0;
+    int d[16];
+
+    #pragma unroll
+    for (int i = 0; i < 16; i++)
+    {
+        d[i] = p - halo_pixels[i];
+    }
+
+    #pragma unroll
+    for( k = 0; k < 16; k += 2 )
+    {
+        int a = min(d[(k+1)&15], d[(k+2)&15]);
+        a = min(a, d[(k+3)&15]);
+        a = min(a, d[(k+4)&15]);
+        a = min(a, d[(k+5)&15]);
+        a = min(a, d[(k+6)&15]);
+        a = min(a, d[(k+7)&15]);
+        a = min(a, d[(k+8)&15]);
+        a0 = max(a0, min(a, d[k&15]));
+        a0 = max(a0, min(a, d[(k+9)&15]));
+    }
+
+    b0 = -a0;
+    #pragma unroll
+    for( k = 0; k < 16; k += 2 )
+    {
+        int b = max(d[(k+1)&15], d[(k+2)&15]);
+        b = max(b, d[(k+3)&15]);
+        b = max(b, d[(k+4)&15]);
+        b = max(b, d[(k+5)&15]);
+        b = max(b, d[(k+6)&15]);
+        b = max(b, d[(k+7)&15]);
+        b = max(b, d[(k+8)&15]);
+        b0 = min(b0, max(b, d[k]));
+        b0 = min(b0, max(b, d[(k+9)&15]));
+    }
+
+    return -b0-1;
+}
+
+static inline void update_halo_pixels(
+        __local uchar *smem,
+        int block_x, int block_y,
+        int* halo_pixels)
+{
+    halo_pixels[0] = smem[IN_OFFSET_Y(block_x,block_y-3)];
+    halo_pixels[1] = smem[IN_OFFSET_Y(block_x+1,block_y-3)];
+    halo_pixels[2] = smem[IN_OFFSET_Y(block_x+2,block_y-2)];
+    halo_pixels[3] = smem[IN_OFFSET_Y(block_x+3,block_y-1)];
+    halo_pixels[4] = smem[IN_OFFSET_Y(block_x+3,block_y)];
+    halo_pixels[5] = smem[IN_OFFSET_Y(block_x+3,block_y+1)];
+    halo_pixels[6] = smem[IN_OFFSET_Y(block_x+2,block_y+2)];
+    halo_pixels[7] = smem[IN_OFFSET_Y(block_x+1,block_y+3)];
+    halo_pixels[8] = smem[IN_OFFSET_Y(block_x,block_y+3)];
+    halo_pixels[9] = smem[IN_OFFSET_Y(block_x-1,block_y+3)];
+    halo_pixels[10] = smem[IN_OFFSET_Y(block_x-2,block_y+2)];
+    halo_pixels[11] = smem[IN_OFFSET_Y(block_x-3,block_y+1)];
+    halo_pixels[12] = smem[IN_OFFSET_Y(block_x-3,block_y)];
+    halo_pixels[13] = smem[IN_OFFSET_Y(block_x-3,block_y-1)];
+    halo_pixels[14] = smem[IN_OFFSET_Y(block_x-2,block_y-2)];
+    halo_pixels[15] = smem[IN_OFFSET_Y(block_x-1,block_y-3)];
+}
+
+static inline bool compute_nms(
+        __local uchar *smem,
+        int block_x, int block_y,
+        int pixel_score)
+{
+    // Pixels around the one we are computing.
+    // Naming: x-offset,y-offset with the offset being one of:
+    // m (minus), e (equal), p (plus)
+    int halo_pixels[16];
+    int mm, em, pm, me, pe, mp, ep, pp;
+
+    #define GET_SCORE(x, y, score) \
+        update_halo_pixels(smem, x, y, halo_pixels); \
+        score = compute_score(smem[IN_OFFSET_Y(x,y)], halo_pixels)
+
+    GET_SCORE(block_x-1, block_y-1, mm);
+    GET_SCORE(block_x, block_y-1, em);
+    GET_SCORE(block_x+1, block_y-1, pm);
+    GET_SCORE(block_x-1, block_y, me);
+    GET_SCORE(block_x+1, block_y, pe);
+    GET_SCORE(block_x-1, block_y+1, mp);
+    GET_SCORE(block_x, block_y+1, ep);
+    GET_SCORE(block_x+1, block_y+1, pp);
+
+    return (((pixel_score > mm) +
+             (pixel_score > em) +
+             (pixel_score > pm) +
+             (pixel_score > me) +
+             (pixel_score > pe) +
+             (pixel_score > mp) +
+             (pixel_score > ep) +
+             (pixel_score > pp)) != 8);
+}
+#endif // NMS
 
 static inline void fast_compute_block(
     __local uchar *smem,
@@ -132,6 +236,14 @@ static inline void fast_compute_block(
                     CHECK(10) + CHECK(11) + CHECK(12) + CHECK(13) + CHECK(14) +
                     CHECK(15))
                 {
+#if NMS
+                    int pixel_score = compute_score(p, halo_points);
+                    bool discard_pixel = compute_nms(smem, block_x, block_y, pixel_score);
+                    if (discard_pixel)
+                    {
+                        continue;
+                    }
+#endif // NMS
                     int index = atomic_inc(nb_kp);
                     if (index > num_kp_groups)
                     {
@@ -139,8 +251,11 @@ static inline void fast_compute_block(
                     }
                     // Add the location of the keypoint
                     // N clusters can write a maximum of num_kp_groups keypoints each.
-                    kp_loc[1 + 2*index + (num_kp_groups*2)*group_id] = global_point.x + block_x;
-                    kp_loc[2 + 2*index + (num_kp_groups*2)*group_id] = global_point.y + block_y;
+                    kp_loc[1 + KP_DIMENSION*index + (num_kp_groups*KP_DIMENSION)*group_id] = global_point.x + block_x;
+                    kp_loc[2 + KP_DIMENSION*index + (num_kp_groups*KP_DIMENSION)*group_id] = global_point.y + block_y;
+#if NMS
+                    kp_loc[3 + KP_DIMENSION*index + (num_kp_groups*KP_DIMENSION)*group_id] = pixel_score;
+#endif // NMS
                 }
             }
 
@@ -316,93 +431,4 @@ void FAST_findKeypoints(
         kp_loc[0] = (num_groups - 1) * num_kp_groups + nb_kp;
     }
     async_work_group_copy_fence(CLK_GLOBAL_MEM_FENCE);
-}
-
-///////////////////////////////////////////////////////////////////////////
-// nonmaxSupression
-
-inline int cornerScore(__global const uchar* img, int step)
-{
-    int k, tofs, v = img[0], a0 = 0, b0;
-    int d[16];
-    #define LOAD2(idx, ofs) \
-        tofs = ofs; d[idx] = (short)(v - img[tofs]); d[idx+8] = (short)(v - img[-tofs])
-    LOAD2(0, 3);
-    LOAD2(1, -step+3);
-    LOAD2(2, -step*2+2);
-    LOAD2(3, -step*3+1);
-    LOAD2(4, -step*3);
-    LOAD2(5, -step*3-1);
-    LOAD2(6, -step*2-2);
-    LOAD2(7, -step-3);
-
-    #pragma unroll
-    for( k = 0; k < 16; k += 2 )
-    {
-        int a = min((int)d[(k+1)&15], (int)d[(k+2)&15]);
-        a = min(a, (int)d[(k+3)&15]);
-        a = min(a, (int)d[(k+4)&15]);
-        a = min(a, (int)d[(k+5)&15]);
-        a = min(a, (int)d[(k+6)&15]);
-        a = min(a, (int)d[(k+7)&15]);
-        a = min(a, (int)d[(k+8)&15]);
-        a0 = max(a0, min(a, (int)d[k&15]));
-        a0 = max(a0, min(a, (int)d[(k+9)&15]));
-    }
-
-    b0 = -a0;
-    #pragma unroll
-    for( k = 0; k < 16; k += 2 )
-    {
-        int b = max((int)d[(k+1)&15], (int)d[(k+2)&15]);
-        b = max(b, (int)d[(k+3)&15]);
-        b = max(b, (int)d[(k+4)&15]);
-        b = max(b, (int)d[(k+5)&15]);
-        b = max(b, (int)d[(k+6)&15]);
-        b = max(b, (int)d[(k+7)&15]);
-        b = max(b, (int)d[(k+8)&15]);
-
-        b0 = min(b0, max(b, (int)d[k]));
-        b0 = min(b0, max(b, (int)d[(k+9)&15]));
-    }
-
-    return -b0-1;
-}
-
-__kernel
-void FAST_nonmaxSupression(
-    __global const int* kp_in, volatile __global int* kp_out,
-    __global const uchar * _img, int step, int img_offset,
-    int rows, int cols, int counter, int max_keypoints)
-{
-    const int idx = get_global_id(0);
-
-    if (idx < counter)
-    {
-        int x = kp_in[1 + 2*idx];
-        int y = kp_in[2 + 2*idx];
-
-        __global const uchar* img = _img + mad24(y, step, x + img_offset);
-
-        int s = cornerScore(img, step);
-
-        if( (x < 4 || s > cornerScore(img-1, step)) +
-            (y < 4 || s > cornerScore(img-step, step)) != 2 )
-            return;
-        if( (x >= cols - 4 || s > cornerScore(img+1, step)) +
-            (y >= rows - 4 || s > cornerScore(img+step, step)) +
-            (x < 4 || y < 4 || s > cornerScore(img-step-1, step)) +
-            (x >= cols - 4 || y < 4 || s > cornerScore(img-step+1, step)) +
-            (x < 4 || y >= rows - 4 || s > cornerScore(img+step-1, step)) +
-            (x >= cols - 4 || y >= rows - 4 || s > cornerScore(img+step+1, step)) == 6)
-        {
-            int new_idx = atomic_inc(kp_out);
-            if( new_idx < max_keypoints )
-            {
-                kp_out[1 + 3*new_idx] = x;
-                kp_out[2 + 3*new_idx] = y;
-                kp_out[3 + 3*new_idx] = s;
-            }
-        }
-    }
 }
