@@ -261,6 +261,7 @@ KALRAY_BENCH_OUTPUT:=kalray_bench_output.log
 run_mppa_bench:
 	-rm $(KALRAY_BENCH_OUTPUT)
 	make FORCE_SAMPLE=10 _run_canny_perf_mppa
+	make FORCE_SAMPLE=10 _run_fast_perf_mppa
 
 # Canny kernels
 # ======================================================================================
@@ -268,9 +269,11 @@ run_mppa_bench:
 _perf_parser:
 	@emacs --batch --no-init-file --load $(PWD)/platforms/kvx/format_report.el --eval "(my-format-perf-report \"$(OUTPUT).log\")" >  $(OUTPUT)_parsed.log
 	@if [ $(FORCE_SAMPLE) -gt 1 ] && [ "$(FIRST_KERNEL_NAME)" != "" ] ; then \
-		cat $(OUTPUT)_parsed.log | sed  "s/$(FIRST_KERNEL_NAME)/\n\t$(FIRST_KERNEL_NAME)/g" | tee $(KALRAY_BENCH_OUTPUT); \
+		cat $(OUTPUT)_parsed.log | sed  "s/$(FIRST_KERNEL_NAME)/\n\t$(FIRST_KERNEL_NAME)/g" | tee -a $(KALRAY_BENCH_OUTPUT); \
+        echo "\n" >> $(KALRAY_BENCH_OUTPUT); \
 	else \
-		cat $(OUTPUT)_parsed.log | tee $(KALRAY_BENCH_OUTPUT); \
+		cat $(OUTPUT)_parsed.log | tee -a $(KALRAY_BENCH_OUTPUT); \
+        echo "\n" >> $(KALRAY_BENCH_OUTPUT); \
 	fi
 	@echo
 
