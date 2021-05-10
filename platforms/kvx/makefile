@@ -122,7 +122,7 @@ clinfo:
 # run environment
 # ======================================================================================
 
-COMMUN_ENV=	\
+COMMON_ENV=	\
   PATH=$(PATH):$(PWD)/build/bin \
   LD_LIBRARY_PATH=$(LD_LIBRARY_PATH):$(PWD)/build/lib \
 	OPENCV_TEST_DATA_PATH=$(OPENCV_TEST_DATA_PATH) \
@@ -199,7 +199,7 @@ checl_pbwgsize_all:
 
 # filter to unsupported test
 run_mppa_perf_imgproc:build/bin/opencv_perf_imgproc
-	${COMMUN_ENV} \
+	${COMMON_ENV} \
 	${ENABLE_MPPA_IN_SPMD_MODE} \
 	POCL_DEBUG=$(POCL_DEBUG) \
 	$< --perf_force_samples=$(FORCE_SAMPLE) \
@@ -210,7 +210,7 @@ run_gpu_%: build/bin/opencv_%
 	@echo
 	@echo " Run $< as GPU device"
 	@echo
-	${COMMUN_ENV} \
+	${COMMON_ENV} \
 	${ENABLE_GPU} \
 	$< --perf_force_samples=$(FORCE_SAMPLE) \
 	--gtest_filter="*CL*"
@@ -220,7 +220,7 @@ run_mppa_%: build/bin/opencv_%
 	@echo
 	@echo " Run $< as MPPA device in SPMD configuration"
 	@echo
-	${COMMUN_ENV} \
+	${COMMON_ENV} \
 	${ENABLE_MPPA_IN_SPMD_MODE} \
 	POCL_DEBUG=$(POCL_DEBUG) \
 	$< --perf_force_samples=$(FORCE_SAMPLE) \
@@ -279,7 +279,7 @@ run_canny_perf_gpu: build_perf_canny
 	@echo
 	POCL_DEBUG=$(POCL_DEBUG) \
 	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=256 \
-	${COMMUN_ENV} \
+	${COMMON_ENV} \
   ${ENABLE_GPU} \
 	${TIME} ${VALGRING} opencv_perf_imgproc --perf_force_samples=$(FORCE_SAMPLE) \
 	--gtest_filter="*CL_CannyFixture_Canny.Canny*"  2>&1 | tee $@.log
@@ -291,7 +291,7 @@ run_canny_test_mppa: build_test_canny
 	@echo
 	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16 \
 	POCL_DEBUG=$(POCL_DEBUG) \
-	${COMMUN_ENV} \
+	${COMMON_ENV} \
 	${ENABLE_MPPA_IN_SPMD_MODE} \
 	${TIME} opencv_test_imgproc \
 	--gtest_filter="*OCL_ImgProc/Canny.Accuracy/*"
@@ -306,7 +306,7 @@ _run_canny_perf_mppa:
 	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16 \
 	POCL_DEBUG=$(POCL_DEBUG) \
 	POCL_TRACING=cq \
-	${COMMUN_ENV} \
+	${COMMON_ENV} \
   ${ENABLE_MPPA_IN_SPMD_MODE} \
 	${TIME} ${VALGRING} opencv_perf_imgproc --perf_force_samples=$(FORCE_SAMPLE) \
 	--gtest_filter="*CL_CannyFixture_Canny.Canny/*" 2>&1 | tee $@.log
@@ -331,7 +331,7 @@ _run_fast_perf_mppa:
 	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16 \
 	POCL_DEBUG=$(POCL_DEBUG) \
 	POCL_TRACING=cq \
-	${COMMUN_ENV} \
+	${COMMON_ENV} \
   ${ENABLE_MPPA_IN_SPMD_MODE} \
 	${TIME} ${VALGRING} opencv_perf_features2d --perf_force_samples=$(FORCE_SAMPLE) \
 	--gtest_filter="$(subst $(space),,$(FAST_TEST_LIST))" 2>&1 | tee $@.log
