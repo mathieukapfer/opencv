@@ -22,6 +22,11 @@ message(STATUS "    include path: ${OpenCV_INCLUDE_DIRS}")
 # Lsp mode
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Declare the executable target built from your sources
+add_executable(video_demo video_demo.cpp)
+
+# Link your application with OpenCV libraries
+target_link_libraries(video_demo PRIVATE ${OpenCV_LIBS} -pthread)
 
 # Declare the executable target built from your sources
 add_executable(transparent_api transparent_api.cpp)
