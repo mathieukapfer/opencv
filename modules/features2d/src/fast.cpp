@@ -423,8 +423,6 @@ static bool ocl_FAST_kalray( InputArray _img, std::vector<KeyPoint>& keypoints,
     else
     {
         Point3i* pt = (Point3i*)(mcounter.ptr<int>() + max_compute_units);
-        // Sorting the points are quite costly on big images.
-        std::sort(pt, pt + maxKeypoints, cmp_pt<Point3i>());
 
         for (int cluster = 0; cluster < max_compute_units; cluster++)
         {
