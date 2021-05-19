@@ -77,12 +77,12 @@
 #include "opencv2/core/utils/allocator_stats.impl.hpp"
 #undef CV__ALLOCATOR_STATS_LOG
 
-#define CV_OPENCL_ALWAYS_SHOW_BUILD_LOG          1
+#define CV_OPENCL_ALWAYS_SHOW_BUILD_LOG          0
 
-#define CV_OPENCL_SHOW_RUN_KERNELS               1
-#define CV_OPENCL_TRACE_CHECK                    1
+#define CV_OPENCL_SHOW_RUN_KERNELS               0
+#define CV_OPENCL_TRACE_CHECK                    0
 
-#define CV_OPENCL_VALIDATE_BINARY_PROGRAMS       1
+#define CV_OPENCL_VALIDATE_BINARY_PROGRAMS       0
 
 #define CV_OPENCL_SHOW_SVM_ERROR_LOG             0
 #define CV_OPENCL_SHOW_SVM_LOG                   0
@@ -4634,7 +4634,7 @@ Program Context::Impl::getProg(const ProgramSource& src,
             getPrefixString().c_str(),
             buildflags.c_str());
 
-#ifdef CV_OPENCL_ALWAYS_SHOW_BUILD_LOG
+#if CV_OPENCL_ALWAYS_SHOW_BUILD_LOG
     std::cout
       << "----------------------  " << std::endl
       << "build info:" << std::endl << key << std::endl
