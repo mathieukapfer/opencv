@@ -47,6 +47,7 @@
 
 #include <opencv2/core/utils/configuration.private.hpp>
 
+#include <atomic>
 #include <vector>
 #include <iostream>
 
@@ -65,6 +66,26 @@ namespace cv {
 
 #include "smooth.simd.hpp"
 #include "smooth.simd_declarations.hpp" // defines CV_CPU_DISPATCH_MODES_ALL=AVX2,...,BASELINE based on CMakeLists.txt content
+
+static void setKalrayOclLinkFlags()
+{
+    static std::atomic<bool> done(false);
+    if (done) {
+        return;
+    }
+    std::string lib_path =
+        cv::utils::getConfigurationParameterString("OPENCV_MPPA_MICROKERNEL_LIB", "");
+    if (lib_path.empty()) {
+        lib_path = cv::utils::getConfigurationParameterString("KALRAY_TOOLCHAIN_DIR", "");
+        if (lib_path.empty()) {
+            CV_Error(CV_StsAssert, "Either OPENCV_MPPA_MICROKERNEL_LIB or "
+                                   "KALRAY_TOOLCHAIN_DIR should be set.");
+        }
+        lib_path += "/kvx-cos/lib/libopencv_kalray_ukernels.a";
+    }
+    setenv("POCL_MPPA_EXTRA_BUILD_LFLAGS", lib_path.c_str(), 1);
+    done = true;
+}
 
 namespace cv {
 
@@ -315,13 +336,67 @@ Ptr<FilterEngine> createGaussianFilter( int type, Size ksize,
 
 #ifdef HAVE_OPENCL
 
+static bool ocl_GaussianBlur_8UC1_kalray(InputArray _src, OutputArray _dst,
+                                         int ddepth, Mat kernelX,
+                                         Mat kernelY, int borderType)
+{
+    const ocl::Device &dev = ocl::Device::getDefault();
+    int type = _src.type(), sdepth = CV_MAT_DEPTH(type), cn = CV_MAT_CN(type);
+
+    if (ddepth < 0)
+        ddepth = sdepth;
+
+    Size size = _src.size();
+    size_t globalsize[2] = { dev.maxComputeUnits() * dev.maxWorkGroupSize(), 1 };
+    size_t localsize[2] = { dev.maxWorkGroupSize(), 1 };
+
+    setKalrayOclLinkFlags();
+    static bool bypass_async =
+        utils::getConfigurationParameterBool("OPENCV_MPPA_BYPASS_ASYNC", false);
+    static bool use_papi =
+        utils::getConfigurationParameterBool("OPENCV_MPPA_USE_PAPI", false);
+    static bool use_naive_convolution =
+        utils::getConfigurationParameterBool("OPENCV_MPPA_USE_NAIVE_GAUSSIAN", false);
+
+    // Note: for now, we could only get there with BORDER_REPLICATE or BORDER_REFLECT.
+    const char * const borderMap[] = { "BORDER_CONSTANT", "BORDER_REPLICATE", "BORDER_REFLECT", 0, "BORDER_REFLECT_101" };
+    char build_opts[1024];
+    sprintf(build_opts, "-D %s %s%s %s %s %s", borderMap[borderType & ~BORDER_ISOLATED],
+            ocl::kernelToStr(kernelX, CV_32F, "KERNEL_MATRIX_X").c_str(),
+            ocl::kernelToStr(kernelY, CV_32F, "KERNEL_MATRIX_Y").c_str(),
+            bypass_async ? "-DKALRAY_BYPASS_ASYNC" : "",
+            use_papi ? "-DHAVE_PAPI" : "",
+            use_naive_convolution ? "-DUSE_NAIVE_CONVOLUTION" : "");
+
+    ocl::Kernel kernel;
+    kernel.create("gaussianBlur3x3_8UC1_cols16_rows2", cv::ocl::imgproc::gaussianBlur3x3_kalray_oclsrc, build_opts);
+    if (kernel.empty())
+        return false;
+
+    UMat src = _src.getUMat();
+    _dst.create(size, CV_MAKETYPE(ddepth, cn));
+    if (!(_dst.offset() == 0 && _dst.step() % 4 == 0))
+        return false;
+    UMat dst = _dst.getUMat();
+
+    int idxArg = kernel.set(0, ocl::KernelArg::PtrReadOnly(src));
+    idxArg = kernel.set(idxArg, (int)src.step);
+    idxArg = kernel.set(idxArg, ocl::KernelArg::PtrWriteOnly(dst));
+    idxArg = kernel.set(idxArg, (int)dst.step);
+    idxArg = kernel.set(idxArg, (int)dst.rows);
+    idxArg = kernel.set(idxArg, (int)dst.cols);
+
+    return kernel.run(2, globalsize, (localsize[0] == 0) ? NULL : localsize, false);
+}
+
 static bool ocl_GaussianBlur_8UC1(InputArray _src, OutputArray _dst, Size ksize, int ddepth,
                                   InputArray _kernelX, InputArray _kernelY, int borderType)
 {
     const ocl::Device & dev = ocl::Device::getDefault();
     int type = _src.type(), sdepth = CV_MAT_DEPTH(type), cn = CV_MAT_CN(type);
 
-    if ( !(dev.isIntel() && (type == CV_8UC1) &&
+    if ( !((dev.isKalray() || dev.isIntel()) &&
+         (type == CV_8UC1) &&
          (_src.offset() == 0) && (_src.step() % 4 == 0) &&
          ((ksize.width == 5 && (_src.cols() % 4 == 0)) ||
          (ksize.width == 3 && (_src.cols() % 16 == 0) && (_src.rows() % 2 == 0)))) )
@@ -351,6 +426,14 @@ static bool ocl_GaussianBlur_8UC1(InputArray _src, OutputArray _dst, Size ksize,
         globalsize[0] = size.width / 4;
         globalsize[1] = size.height / 1;
     }
+
+    bool bypass_kalray = getenv("OPENCV_AVOID_KALRAY_GAUSSIAN") != nullptr;
+    if ((ksize.width == 3 && dev.isKalray() &&
+            ((borderType & ~BORDER_ISOLATED) == BORDER_REPLICATE ||
+             (borderType & ~BORDER_ISOLATED) == BORDER_REFLECT)) &&
+        !bypass_kalray)
+        return ocl_GaussianBlur_8UC1_kalray(_src, _dst, ddepth, kernelX,
+                                            kernelY, borderType);
 
     const char * const borderMap[] = { "BORDER_CONSTANT", "BORDER_REPLICATE", "BORDER_REFLECT", 0, "BORDER_REFLECT_101" };
     char build_opts[1024];
@@ -621,7 +704,7 @@ void GaussianBlur(InputArray _src, OutputArray _dst, Size ksize,
     _dst.create( size, type );
 
     if( (borderType & ~BORDER_ISOLATED) != BORDER_CONSTANT &&
-        ((borderType & BORDER_ISOLATED) != 0 || !_src.getMat().isSubmatrix()) )
+        ((borderType & BORDER_ISOLATED) != 0 || !_src.isSubmatrix()) )
     {
         if( size.height == 1 )
             ksize.height = 1;

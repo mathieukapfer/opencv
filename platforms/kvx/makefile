@@ -339,3 +339,22 @@ _run_fast_perf_mppa:
 	${TIME} ${VALGRING} opencv_perf_features2d --perf_force_samples=$(FORCE_SAMPLE) \
 	--gtest_filter="$(subst $(space),,$(FAST_TEST_LIST))" 2>&1 | tee $@.log
 	OUTPUT=$@ FIRST_KERNEL_NAME="FAST_findKeypoints" make _perf_parser
+
+
+# ======================================================================================
+# Specific targets for gauss
+# ======================================================================================
+
+build_perf_gauss:
+	cd build && make opencv_perf_imgproc
+
+perf_gauss_mppa: build_perf_gauss
+	@echo
+	@echo
+	OPENCV_OPENCL_DEVICE_MAX_WORK_GROUP_SIZE=16 \
+	POCL_DEBUG=$(POCL_DEBUG) \
+	${COMMON_ENV} \
+	${ENABLE_MPPA_IN_SPMD_MODE} \
+	${TIME} ${VALGRING} opencv_perf_imgproc --perf_force_samples=$(FORCE_SAMPLE) \
+	--gtest_filter="OCL_bench_gauss_gauss.gauss/*" 2>&1 | tee $@.log
+	emacs --batch --load $(PWD)/platforms/kvx/format_report.el --eval "(my-format-perf-report \"perf_gauss_mppa.log\")" | awk 1 - |  column
