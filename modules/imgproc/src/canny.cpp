@@ -222,7 +222,8 @@ static bool ocl_Canny_kalray(InputArray _src, const UMat& dx_, const UMat& dy_, 
 {
     CV_INSTRUMENT_REGION_OPENCL();
 
-    UMat map;
+    _dst.create(size, CV_8UC1);
+    UMat dst = _dst.getUMat();
 
     const ocl::Device &dev = ocl::Device::getDefault();
     int max_wg_size = (int)dev.maxWorkGroupSize();
@@ -329,9 +330,8 @@ static bool ocl_Canny_kalray(InputArray _src, const UMat& dx_, const UMat& dy_, 
             return false;
 
         UMat src = _src.getUMat();
-        map.create(size, CV_8U);
         with_sobel.args(ocl::KernelArg::ReadOnly(src),
-                        ocl::KernelArg::WriteOnlyNoSize(map),
+                        ocl::KernelArg::WriteOnlyNoSize(dst),
                         (float) low, (float) high);
 
         if (!with_sobel.run(2, globalsize, localsize, false))
@@ -369,9 +369,8 @@ static bool ocl_Canny_kalray(InputArray _src, const UMat& dx_, const UMat& dy_, 
         if (without_sobel.empty())
             return false;
 
-        map.create(size, CV_32S);
         without_sobel.args(ocl::KernelArg::ReadOnlyNoSize(dx), ocl::KernelArg::ReadOnlyNoSize(dy),
-                           ocl::KernelArg::WriteOnly(map),
+                           ocl::KernelArg::WriteOnly(dst),
                            low, high);
 
         size_t globalsize[2] = { (size_t)size.width, (size_t)size.height },
@@ -399,7 +398,7 @@ static bool ocl_Canny_kalray(InputArray _src, const UMat& dx_, const UMat& dy_, 
         if (edgesHysteresis.empty())
             return false;
 
-        edgesHysteresis.args(ocl::KernelArg::ReadWrite(map));
+        edgesHysteresis.args(ocl::KernelArg::ReadWrite(dst));
         if (!edgesHysteresis.run(2, step2globalsize, step2localsize, false))
             return false;
     }
@@ -410,10 +409,7 @@ static bool ocl_Canny_kalray(InputArray _src, const UMat& dx_, const UMat& dy_, 
     if (getEdgesKernel.empty())
         return false;
 
-    _dst.create(size, CV_8UC1);
-    UMat dst = _dst.getUMat();
-
-    getEdgesKernel.args(ocl::KernelArg::ReadOnly(map), ocl::KernelArg::WriteOnlyNoSize(dst));
+    getEdgesKernel.args(ocl::KernelArg::ReadOnly(dst), ocl::KernelArg::WriteOnlyNoSize(dst));
 
     size_t step3localsize[2] = { (size_t)16, (size_t)1 };
     size_t step3globalsize[2] = { (size_t)80, (size_t)1 };
