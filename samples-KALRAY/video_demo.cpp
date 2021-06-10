@@ -235,7 +235,7 @@ int main(int argc, const char *argv[]) {
     std::chrono::time_point<std::chrono::steady_clock> stop_processing;
 
     // FAST specific instantiation.
-    cv::Ptr<cv::Feature2D> detector = cv::FastFeatureDetector::create(20, false, FastFeatureDetector::TYPE_9_16);
+    cv::Ptr<cv::Feature2D> detector = cv::FastFeatureDetector::create(20, true, FastFeatureDetector::TYPE_9_16);
     std::vector<cv::KeyPoint> keypoints;
     fast_data fast_frame;
 

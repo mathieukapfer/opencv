@@ -90,23 +90,33 @@ static inline bool compute_nms(
         update_halo_pixels(smem, x, y, halo_pixels); \
         score = compute_score(smem[IN_OFFSET_Y(x,y)], halo_pixels)
 
+    // Originally, the code adds the results of the 8 operations and compares
+    // it to 8, in order to allow the compiler to vectorize the code.
+    // There however seems to be a performance degradation in one of the
+    // versions of the compiler. To work around it, we ask the compiler to
+    // short-circuit at several points.
+    // Ref T16577
     GET_SCORE(block_x-1, block_y-1, mm);
     GET_SCORE(block_x, block_y-1, em);
+    if (pixel_score <= mm || pixel_score <= em) {
+        return false;
+    }
     GET_SCORE(block_x+1, block_y-1, pm);
     GET_SCORE(block_x-1, block_y, me);
+    if (pixel_score <= pm || pixel_score <= me) {
+        return false;
+    }
     GET_SCORE(block_x+1, block_y, pe);
     GET_SCORE(block_x-1, block_y+1, mp);
+    if (pixel_score <= pe || pixel_score <= mp) {
+        return false;
+    }
     GET_SCORE(block_x, block_y+1, ep);
     GET_SCORE(block_x+1, block_y+1, pp);
-
-    return (((pixel_score > mm) +
-             (pixel_score > em) +
-             (pixel_score > pm) +
-             (pixel_score > me) +
-             (pixel_score > pe) +
-             (pixel_score > mp) +
-             (pixel_score > ep) +
-             (pixel_score > pp)) != 8);
+    if (pixel_score <= ep || pixel_score <= pp) {
+        return false;
+    }
+    return true;
 }
 #endif // NMS
 
